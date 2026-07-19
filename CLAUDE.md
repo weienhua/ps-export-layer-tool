@@ -1,6 +1,6 @@
-# CEP 面板模板 — PS CEP 插件
+# PS 图层导出工具 — PS CEP 插件
 
-Adobe Photoshop CEP 面板插件模板项目，兼容 PS 2019（v20.0）及以上版本。可从此模板复制后快速启动任何 CEP 面板插件项目。
+Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。兼容 PS 2019（v20.0）及以上版本。
 
 ## 技术栈
 
@@ -9,7 +9,7 @@ Adobe Photoshop CEP 面板插件模板项目，兼容 PS 2019（v20.0）及以�
 - **宿主运行时增强**：`extendscript-es5-shim`（ES5 API polyfill）/ `cep-shim`（面板侧 CEP 垫片）
 - **宿主工具库**：`photoshop-script-api`（vendored in `src/jsx/ps-api/`，Apache 2.0）
 - **类型**：`ps-extendscript-types`（宿主）/ 自定义 `cep-panel.d.ts`（面板）
-- **CEP 版本**：9.0+，扩展 ID：`com.example.panel`
+- **CEP 版本**：9.0+，扩展 ID：`com.ps.export.layer.tool`
 
 ## 项目结构
 
@@ -82,11 +82,11 @@ npm run package            # 生产模式构建 + 打包发布文件（zip + 安
 ### 打包产物
 
 `npm run package` 生成：
-- `com.example.panel-vX.X.X.zip` — 跨平台手动安装包
-- `com.example.panel-installer.exe` — Windows 自动安装程序
-- `com.example.panel-installer-macos` — macOS 自动安装程序
-- `com.example.panel-uninstaller.exe` — Windows 卸载程序
-- `com.example.panel-uninstaller-macos` — macOS 卸载程序
+- `com.ps.export.layer.tool-vX.X.X.zip` — 跨平台手动安装包
+- `com.ps.export.layer.tool-installer.exe` — Windows 自动安装程序
+- `com.ps.export.layer.tool-installer-macos` — macOS 自动安装程序
+- `com.ps.export.layer.tool-uninstaller.exe` — Windows 卸载程序
+- `com.ps.export.layer.tool-uninstaller-macos` — macOS 卸载程序
 
 `pkg` 支持交叉编译，可在 macOS 上同时生成 Windows 和 macOS 安装程序。
 
@@ -264,33 +264,33 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 ### macOS — 符号链接（开发推荐）
 
 ```bash
-ln -s $(pwd) ~/Library/Application\ Support/Adobe/CEP/extensions/com.example.panel
+ln -s $(pwd) ~/Library/Application\ Support/Adobe/CEP/extensions/com.ps.export.layer.tool
 ```
 
 ### Windows — 目录联接（管理员 PowerShell）
 
 ```powershell
-New-Item -ItemType Junction -Path "$env:APPDATA\Adobe\CEP\extensions\com.example.panel" -Target (Get-Location)
+New-Item -ItemType Junction -Path "$env:APPDATA\Adobe\CEP\extensions\com.ps.export.layer.tool" -Target (Get-Location)
 ```
 
 ### 删除链接（仅移除链接，不影响源目录内容）
 
 ```bash
 # macOS
-unlink ~/Library/Application\ Support/Adobe/CEP/extensions/com.example.panel
+unlink ~/Library/Application\ Support/Adobe/CEP/extensions/com.ps.export.layer.tool
 
 # Windows（PowerShell，用 cmd /c rmdir 避免误删源目录）
-cmd /c rmdir "$env:APPDATA\Adobe\CEP\extensions\com.example.panel"
+cmd /c rmdir "$env:APPDATA\Adobe\CEP\extensions\com.ps.export.layer.tool"
 ```
 
 ### 查看链接状态
 
 ```bash
 # macOS
-ls -la ~/Library/Application\ Support/Adobe/CEP/extensions/ | grep example
+ls -la ~/Library/Application\ Support/Adobe/CEP/extensions/ | grep export-layer
 
 # Windows（PowerShell）
-Get-Item "$env:APPDATA\Adobe\CEP\extensions\com.example.panel" | Select-Object Attributes, LinkType, Target
+Get-Item "$env:APPDATA\Adobe\CEP\extensions\com.ps.export.layer.tool" | Select-Object Attributes, LinkType, Target
 ```
 
 ### 开启 CEP 调试模式
@@ -320,20 +320,6 @@ Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.11" -Name "PlayerDebugMode" -V
 也可使用 `doc/csxs.reg/` 目录中的注册表文件直接导入。
 
 调试地址：`http://localhost:8088`（Chrome DevTools）
-
-## 从模板创建新项目
-
-1. 复制 `ps-cep-template/` 为你的项目目录
-2. 全局查找替换以下占位符：
-   - `com.example.panel` → 你的 CEP Extension ID
-   - `CEP 面板模板` → 你的面板名称
-   - `ps-cep-template` → 你的 npm 包名
-3. 修改 `CSXS/manifest.xml` 中的 Extension ID
-4. 修改 `.debug` 中的 Extension Id
-5. 修改 `scripts/install.js` 顶部的 `EXTENSION_ID`
-6. 修改 `scripts/build-installer.js` 中的 ID 引用
-7. `npm install && npm run build`
-8. 开始添加业务功能
 
 ## 常见问题排查
 

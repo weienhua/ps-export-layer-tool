@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CEP 面板模板 - 自动卸载脚本
+ * PS 图层导出工具 - 自动卸载脚本
  * 支持 Windows / macOS
  */
 
@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 
-const EXTENSION_ID = 'com.example.panel';
+const EXTENSION_ID = 'com.ps.export.layer.tool';
 // 卸载时需要保留的用户文件（相对于 lib/ 目录）
 const LIB_KEEP_FILES = [];
 // 卸载时需要保留的用户目录（相对于 dist/lib/ 目录）
@@ -120,7 +120,7 @@ function backupLibKeepDirs(targetDir) {
 function main() {
   console.log('');
   console.log('╔══════════════════════════════════════════════╗');
-  console.log('║       CEP 面板模板 - 自动卸载程序            ║');
+  console.log('║       PS 图层导出工具 - 自动卸载程序            ║');
   console.log('╚══════════════════════════════════════════════╝');
   console.log('');
 
@@ -154,7 +154,7 @@ function main() {
 
   // 2. 检查是否已安装
   if (!fs.existsSync(targetDir)) {
-    log('未检测到已安装的 CEP 面板模板插件', 'warn');
+    log('未检测到已安装的 PS 图层导出工具插件', 'warn');
     console.log('');
     console.log('按任意键退出...');
     if (process.stdin.isTTY) {

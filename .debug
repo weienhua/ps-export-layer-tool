@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ExtensionList>
-  <Extension Id="com.example.panel">
+  <Extension Id="com.ps.export.layer.tool">
     <HostList>
       <Host Name="PHXS" Port="8088"/>
       <Host Name="PHSP" Port="8088"/>

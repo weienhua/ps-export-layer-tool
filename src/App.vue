@@ -1,7 +1,7 @@
 <template>
   <div ref="containerRef" class="container" @click="handleContainerClick">
     <div class="header card">
-      <h1>CEP 面板模板</h1>
+      <h1>PS 图层导出工具</h1>
       <DocInfo />
     </div>
 

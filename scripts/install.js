@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CEP 面板模板 - 自动安装脚本
+ * PS 图层导出工具 - 自动安装脚本
  * 支持 Windows / macOS
  * 自动检测 Photoshop 版本、复制插件文件、开启调试模式
  */
@@ -11,7 +11,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 
-const EXTENSION_ID = 'com.example.panel';
+const EXTENSION_ID = 'com.ps.export.layer.tool';
 const CSXS_VERSIONS = [6, 7, 8, 9, 10, 11];
 // 安装时需要保留的用户文件（相对于 lib/ 目录）
 const LIB_KEEP_FILES = [];
@@ -337,7 +337,7 @@ function enableDebugModeMac() {
 function main() {
   console.log('');
   console.log('╔══════════════════════════════════════════════╗');
-  console.log('║       CEP 面板模板 - 自动安装程序            ║');
+  console.log('║       PS 图层导出工具 - 自动安装程序            ║');
   console.log('╚══════════════════════════════════════════════╝');
   console.log('');
 
@@ -530,7 +530,7 @@ function main() {
   console.log('║             安装完成！                       ║');
   console.log('╠══════════════════════════════════════════════╣');
   console.log('║  请重启 Photoshop，然后在菜单中找到：        ║');
-  console.log('║  窗口 → 扩展 → CEP 面板模板                 ║');
+  console.log('║  窗口 → 扩展 → PS 图层导出工具                 ║');
   console.log('╚══════════════════════════════════════════════╝');
   console.log('');
 

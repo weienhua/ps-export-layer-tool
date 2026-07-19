@@ -42,14 +42,14 @@ function copyDirSync(src, dest) {
  * 生成 zip 安装包
  */
 function buildZip() {
-  const zipName = `com.example.panel-v${VERSION}.zip`;
+  const zipName = `com.ps.export.layer.tool-v${VERSION}.zip`;
   const zipPath = path.join(INSTALLER_DIR, zipName);
 
   log(`生成 zip 安装包: ${zipName}`);
 
   // 创建临时目录结构
   const tempDir = path.join(ROOT, '.zip-temp');
-  const pluginDir = path.join(tempDir, 'com.example.panel');
+  const pluginDir = path.join(tempDir, 'com.ps.export.layer.tool');
   if (fs.existsSync(tempDir)) {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -71,7 +71,7 @@ function buildZip() {
     } else {
       // macOS/Linux: 使用 zip 命令
       execSync(
-        `cd '${tempDir}' && zip -r '${zipPath}' 'com.example.panel'`,
+        `cd '${tempDir}' && zip -r '${zipPath}' 'com.ps.export.layer.tool'`,
         { stdio: 'inherit' }
       );
     }
@@ -121,7 +121,7 @@ function buildInstaller() {
   log('正在打包 Windows 安装程序...');
   try {
     execSync(
-      `npx pkg . --targets node18-win-x64 --output ../installer/com.example.panel-installer.exe`,
+      `npx pkg . --targets node18-win-x64 --output ../installer/com.ps.export.layer.tool-installer.exe`,
       { cwd: tempDir, stdio: 'inherit' }
     );
     log('Windows 安装程序打包完成');
@@ -144,7 +144,7 @@ function buildInstaller() {
   log('正在打包 Windows 卸载程序...');
   try {
     execSync(
-      `npx pkg . --targets node18-win-x64 --output ../installer/com.example.panel-uninstaller.exe`,
+      `npx pkg . --targets node18-win-x64 --output ../installer/com.ps.export.layer.tool-uninstaller.exe`,
       { cwd: tempDir, stdio: 'inherit' }
     );
     log('Windows 卸载程序打包完成');
@@ -168,7 +168,7 @@ function buildInstaller() {
     log('正在打包 macOS 安装程序...');
     try {
       execSync(
-        `npx pkg . --targets node18-macos-x64 --output ../installer/com.example.panel-installer-macos`,
+        `npx pkg . --targets node18-macos-x64 --output ../installer/com.ps.export.layer.tool-installer-macos`,
         { cwd: tempDir, stdio: 'inherit' }
       );
       log('macOS 安装程序打包完成');
@@ -190,7 +190,7 @@ function buildInstaller() {
     log('正在打包 macOS 卸载程序...');
     try {
       execSync(
-        `npx pkg . --targets node18-macos-x64 --output ../installer/com.example.panel-uninstaller-macos`,
+        `npx pkg . --targets node18-macos-x64 --output ../installer/com.ps.export.layer.tool-uninstaller-macos`,
         { cwd: tempDir, stdio: 'inherit' }
       );
       log('macOS 卸载程序打包完成');
