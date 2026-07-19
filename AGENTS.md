@@ -25,14 +25,14 @@ npm run package            # 生产模式构建 + 打包发布文件（zip + 安
 
 - 面板侧: Vue 3 SFC 组件化架构
   - 入口: `src/main.ts` → `src/App.vue`
-  - 组件: `src/components/*.vue`（`<script setup lang="ts">`）
+  - 组件: `src/components/*.vue`（`<script setup lang="ts">`），含 TabBar、BatchExportTab、SectionCollapsible、AnchorGrid 等
   - 组合式函数: `src/composables/*.ts`
-  - 共享类型: `src/types/index.ts`（AnchorType, SortType）
+  - 共享类型: `src/types/index.ts`（AnchorType, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig, BatchExportResult）
 - 宿主侧: `src/jsx/hostscript.ts` + `src/jsx/modules/` → webpack(ts-loader, target: ES3) → `dist/jsx/hostscript.js`
   - 入口: `src/jsx/hostscript.ts`（import + $.HostScript 注册）
-  - 模块: `src/jsx/modules/`（utils、document、fileOps）
+  - 模块: `src/jsx/modules/`（utils、document、fileOps、batchExport）
   - 共享类型: `src/jsx/modules/types.d.ts`（ActionManager API 声明）
-- 宿主工具库: `src/jsx/ps-api/`（photoshop-script-api，vendored），使用 `Document`、`Layer`、`History`、`Utils`
+- 宿主工具库: `src/jsx/ps-api/`（photoshop-script-api，vendored），所有类须从 `src/jsx/ps-api/src/index.ts` 统一导入，禁止从 `lib/` 子路径单独导入（会导致 webpack 模块冲突）
 - 类型: `src/types/cep-panel.d.ts`（面板）/ `ps-extendscript-types`（宿主）
 - 样式: `src/style.css`（全局基础样式）+ 各 `.vue` 组件 `<style scoped>`
 
@@ -48,8 +48,12 @@ npm run package            # 生产模式构建 + 打包发布文件（zip + 安
 
 ```typescript
 $.HostScript = {
-  getDocumentInfo,
-  getDocumentPath,
+  getDocumentInfo,      // 文档信息
+  getDocumentPath,      // 文档路径（File.fsName）
+  getTextLayerInfo,     // 选中文本图层字体/颜色/样式
+  measureCharacters,    // 测量字符宽高
+  batchExport,          // 完整批量导出
+  selectFolderDialog,   // 文件夹选择对话框
 };
 ```
 
@@ -91,11 +95,11 @@ $.HostScript = {
 
 ## 添加新功能步骤
 
-1. 在 `src/jsx/modules/` 对应模块文件中添加函数并 `export` 导出 (ES3 兼容)
-2. 在 `src/jsx/hostscript.ts` 中导入并在 `$.HostScript` 注册
-3. `src/bridge.ts` 暴露异步方法
-4. `src/components/` 创建或修改 Vue 组件
-5. 如需新的共享类型，添加到 `src/types/index.ts`
+1. 如需新的共享类型，添加到 `src/types/index.ts`
+2. 在 `src/jsx/modules/` 对应模块文件中添加函数并 `export` 导出 (ES3 兼容)
+3. 在 `src/jsx/hostscript.ts` 中导入并在 `$.HostScript` 注册
+4. `src/bridge.ts` 暴露异步方法
+5. `src/components/` 创建或修改 Vue 组件
 6. `npm run build`
 
 ## 调试
@@ -109,7 +113,7 @@ $.HostScript = {
 | 问题 | 原因 |
 |------|------|
 | `CSInterface is not defined` | `dist/lib/CSInterface.js` 缺失 |
-| `EvalScript error` | 宿主脚本语法错误或未编译 |
+| `EvalScript error`（所有调用均失败） | ps-api 类从 `lib/` 子路径导入导致 webpack 模块冲突，须统一从 `ps-api/src/index.ts` 导入 |
 | JSX 修改不生效 | PS 缓存旧脚本，需重启 PS |
 
 ## 更多信息

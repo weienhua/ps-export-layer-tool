@@ -22,11 +22,15 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   │   ├── DocInfo.vue        # 文档信息 + 定时刷新（面板→bridge→hostscript 示例）
 │   │   ├── StatusBar.vue      # 底部状态栏
 │   │   ├── Toast.vue          # Toast 提示（provide/inject）
-│   │   └── DebugPanel.vue     # 调试面板（通信日志）
+│   │   ├── DebugPanel.vue     # 调试面板（通信日志）
+│   │   ├── TabBar.vue         # Tab 导航栏
+│   │   ├── BatchExportTab.vue # 批量导出 Tab（文本图层字符批量导出为 web 素材）
+│   │   ├── SectionCollapsible.vue # 可折叠卡片区域（折叠状态持久化到 localStorage）
+│   │   └── AnchorGrid.vue     # 3×3 锚点网格选择器 + 下拉框
 │   ├── composables/
 │   │   └── useToast.ts        # Toast composable（inject）
 │   ├── types/
-│   │   ├── index.ts           # 共享类型：AnchorType, SortType
+│   │   ├── index.ts           # 共享类型：AnchorType, ExportFormat, TextLayerInfo, BatchExportConfig, BatchExportResult 等
 │   │   └── cep-panel.d.ts     # CSInterface 全局类型（最小化声明）
 │   ├── bridge.ts              # evalScript 封装，Promise 化通信 + 日志回调
 │   ├── index.html             # 精简版 HTML（挂载点 + CSInterface + bundle）
@@ -40,7 +44,8 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │       │   ├── types.d.ts     # 共享类型声明（ActionManager API）
 │       │   ├── utils.ts       # 通用工具（log、rgbToHex、roundValue）
 │       │   ├── document.ts    # 文档/图层基础查询
-│       │   └── fileOps.ts     # 文件系统操作
+│       │   ├── fileOps.ts     # 文件系统操作
+│       │   └── batchExport.ts # 批量导出（文本检测 + 字符测量 + 批量导出，全部 raw ActionManager）
 │       └── ps-api/            # photoshop-script-api 子项目（vendored，ES3 兼容）
 ├── dist/                      # 构建产物，不要手动编辑
 │   ├── index.html / bundle.js # 面板产物（CSS 打包进 bundle.js）
@@ -143,6 +148,15 @@ Promise<PSResult<T>>
 ### 宿主脚本约定
 
 - **ps-api 优先**：宿主脚本中需要 PS 操作时，优先查阅 `src/jsx/ps-api/API.md` 是否已有封装方法（如 `exportToBMP`、`duplicateToDocument`、`History.saveState` 等），这些方法经过验证可直接使用
+- **ps-api 导入统一入口**：所有 ps-api 类（`Document`、`Layer`、`Text`、`SolidColor` 等）必须从 `src/jsx/ps-api/src/index.ts` 统一导入，**禁止**从 `src/jsx/ps-api/src/lib/` 子路径单独导入。单独导入会导致 webpack 模块路径解析不一致，引发整个 hostscript 运行时 `EvalScript error`。
+  ```typescript
+  // ✓ 正确写法
+  import { Document, Layer, Text, SolidColor } from "../ps-api/src/index";
+
+  // ✗ 错误写法 — 会导致 webpack 模块冲突，hostscript 全部报错
+  import { Document } from "../ps-api/src/lib/Document";
+  import { Layer } from "../ps-api/src/lib/Layer";
+  ```
 - 若 ps-api 无对应方法，再查阅 `psdoc/references/` 中的 ActionManager 脚本示例和 API 文档作为参考
 - 仅在两者都无现成方案时才从零编写 ActionManager 代码
 - 所有通过 `$.HostScript` 暴露的函数必须是**全局函数**，返回值只能是**字符串**
@@ -188,9 +202,21 @@ src/jsx/
 │   ├── types.d.ts         # 共享类型声明（ActionManager API）
 │   ├── utils.ts           # 通用工具（log、rgbToHex、roundValue）
 │   ├── document.ts        # 文档/图层基础查询
-│   └── fileOps.ts         # 文件系统操作
+│   ├── fileOps.ts         # 文件系统操作
+│   └── batchExport.ts     # 批量导出（文本检测 + 字符测量 + 批量导出）
 └── ps-api/                # photoshop-script-api（vendored）
 ```
+
+已注册的宿主函数：
+
+| 函数 | 所属模块 | 说明 |
+|------|---------|------|
+| `getDocumentInfo()` | document.ts | 文档名、尺寸 |
+| `getDocumentPath()` | document.ts | 文档文件路径（需用 `.fsName` 取字符串） |
+| `getTextLayerInfo()` | batchExport.ts | 读取选中文本图层的字体/颜色/样式 |
+| `measureCharacters(configJson)` | batchExport.ts | 测量字符宽高，返回 maxWidth/maxHeight |
+| `batchExport(configJson)` | batchExport.ts | 完整批量导出（测量 + 导出） |
+| `selectFolderDialog()` | fileOps.ts | 原生文件夹选择对话框 |
 
 ```typescript
 // 在对应模块文件中定义并导出函数（如 modules/document.ts）
@@ -232,7 +258,26 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 
 ## 面板 UI 功能
 
-### 当前示例组件
+### Tab 布局
+
+- **TabBar**：双 tab 导航（「图层工具」「批量导出」），选中状态持久化到 `localStorage`（key: `exportLayerTool.activeTab.v1`）
+- **图层工具** tab：占位（后续扩展）
+
+### 批量导出 Tab（BatchExportTab）
+
+选中 PS 文本图层后，一键将每个字符导出为统一画布尺寸的 web 素材（PNG/JPG）。
+
+**核心流程**：
+1. 轮询检测选中图层（有文档 1s 间隔，无文档停止）→ 自动读取字体/字号/颜色/样式
+2. 配置导出字符、文件名前缀、画布尺寸（自动检测 + 边距 或 手动输入）、对齐方式（9 点锚位）
+3. 自动默认路径为 PSD 所在目录下的 `output/` 子文件夹
+4. 点击「开始导出」→ 测量每个字符最大宽高 → 以统一画布逐字符导出
+
+**子组件**：
+- **SectionCollapsible**：可折叠卡片，状态持久化到 `localStorage`（key: `exportLayerTool.sectionStates.v1`）。参考 ps-layer-tool 设计
+- **AnchorGrid**：3×3 锚点网格 + 下拉选择器
+
+### 其他基础组件
 
 - **DocInfo**：显示当前文档名和尺寸，每 60 秒自动刷新（展示完整通信链示例）
 - **StatusBar**：底部状态提示（就绪/成功/错误）
@@ -241,12 +286,13 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 
 ## 添加新功能的步骤
 
-1. 在 `src/jsx/modules/` 对应模块文件中添加函数（遵守 ES3 + 返回字符串约定 + `export` 导出）
+1. 如需新的共享类型，添加到 `src/types/index.ts`
+2. 在 `src/jsx/modules/` 对应模块文件中添加函数（遵守 ES3 + 返回字符串约定 + `export` 导出）
    - 如需新的 ActionManager API，在 `modules/types.d.ts` 中添加声明
-2. 在 `src/jsx/hostscript.ts` 中导入函数并在 `$.HostScript` 注册
-3. `src/bridge.ts` 暴露对应异步方法
-4. `src/components/` 创建或修改 Vue 组件（`<script setup lang="ts">`）
-5. 如需新的共享类型，添加到 `src/types/index.ts`
+   - 导入 ps-api 类时**必须从 `src/jsx/ps-api/src/index.ts` 统一入口导入**，禁止从 `lib/` 子路径单独导入（会导致 webpack 模块冲突，hostscript 全部报 `EvalScript error`）
+3. 在 `src/jsx/hostscript.ts` 中导入函数并在 `$.HostScript` 注册
+4. `src/bridge.ts` 暴露对应异步方法
+5. `src/components/` 创建或修改 Vue 组件（`<script setup lang="ts">`）
 6. `npm run build` 重新构建
 
 ## 类型声明
@@ -254,6 +300,7 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 | 文件 | 作用域 | 内容 |
 |------|--------|------|
 | `src/types/cep-panel.d.ts` | 面板侧 | `CSInterface` 类、`HostEnvironment`、`CSEvent` |
+| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息）、`BatchExportConfig`（导出配置）、`BatchExportResult`（导出结果） |
 | `src/jsx/modules/types.d.ts` | 宿主脚本侧 | ActionManager 全局 API（`executeActionGet`、`stringIDToTypeID` 等） |
 | `ps-extendscript-types`（npm） | 宿主脚本侧 | PS ExtendScript DOM（`app`、`Document`、`ArtLayer` 等） |
 

@@ -5,6 +5,16 @@
       <DocInfo />
     </div>
 
+    <TabBar v-model="activeTab" />
+
+    <!-- 批量导出 Tab -->
+    <BatchExportTab v-if="activeTab === 'batch'" />
+
+    <!-- 图层工具 Tab（占位） -->
+    <div v-else-if="activeTab === 'layers'" class="card">
+      <div class="empty-state">图层工具即将上线</div>
+    </div>
+
     <StatusBar :message="statusMsg" :isError="statusError" />
     <DebugPanel />
     <Toast ref="toastRef" />
@@ -12,15 +22,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, provide, computed, onMounted, onUnmounted } from "vue";
+import { ref, provide, computed, watch, onMounted, onUnmounted } from "vue";
 import DocInfo from "./components/DocInfo.vue";
 import StatusBar from "./components/StatusBar.vue";
 import DebugPanel from "./components/DebugPanel.vue";
 import Toast from "./components/Toast.vue";
+import TabBar from "./components/TabBar.vue";
+import BatchExportTab from "./components/BatchExportTab.vue";
 
 // 状态管理
 const statusMsg = ref("就绪");
 const statusError = ref(false);
+// 从 localStorage 恢复上次的 tab 选择
+function loadActiveTab(): string {
+  try {
+    var saved = localStorage.getItem("exportLayerTool.activeTab.v1");
+    if (saved === "layers" || saved === "batch") return saved;
+  } catch { /* ignore */ }
+  return "batch";
+}
+const activeTab = ref(loadActiveTab());
+
+// tab 切换时持久化
+watch(activeTab, function (val) {
+  try {
+    localStorage.setItem("exportLayerTool.activeTab.v1", val);
+  } catch { /* ignore */ }
+});
 
 // 响应式紧凑模式（容器宽度 < 360px 时启用简写标签）
 const containerRef = ref<HTMLElement | null>(null);

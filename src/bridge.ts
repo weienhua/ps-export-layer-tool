@@ -8,6 +8,9 @@
 // 调试开关
 const DEBUG = (window as any).DEBUG || false;
 
+// 类型导入
+import type { TextLayerInfo, BatchExportConfig, BatchExportResult } from "./types";
+
 /**
  * 通信日志回调类型
  */
@@ -159,6 +162,53 @@ export class PSBridge {
    */
   async getDocumentInfo(): Promise<PSResult<DocumentInfo>> {
     return this.evalScript<DocumentInfo>("$.HostScript.getDocumentInfo()");
+  }
+
+  /**
+   * 获取选中文本图层的字体信息
+   * @returns Promise 封装的结果
+   */
+  async getTextLayerInfo(): Promise<PSResult<TextLayerInfo>> {
+    return this.evalScript<TextLayerInfo>("$.HostScript.getTextLayerInfo()");
+  }
+
+  /**
+   * 单独检测字符尺寸（仅测量，不导出）
+   * @param config 导出配置
+   */
+  async measureCharacters(config: BatchExportConfig): Promise<PSResult<{ maxWidth: number; maxHeight: number }>> {
+    var configJson = JSON.stringify(config);
+    return this.evalScript<{ maxWidth: number; maxHeight: number }>(
+      "$.HostScript.measureCharacters('" + this.escapeForSingleQuotedString(configJson) + "')"
+    );
+  }
+
+  /**
+   * 获取当前文档的文件路径
+   * @returns Promise 封装的结果
+   */
+  async getDocumentPath(): Promise<PSResult<{ path: string }>> {
+    return this.evalScript<{ path: string }>("$.HostScript.getDocumentPath()");
+  }
+
+  /**
+   * 打开文件夹选择对话框
+   * @returns Promise 封装的结果，包含选中的文件夹路径
+   */
+  async selectFolder(): Promise<PSResult<{ path: string }>> {
+    return this.evalScript<{ path: string }>("$.HostScript.selectFolderDialog()");
+  }
+
+  /**
+   * 批量导出文本图层中的每个字符为独立图片
+   * @param config 导出配置
+   * @returns Promise 封装的结果
+   */
+  async batchExport(config: BatchExportConfig): Promise<PSResult<BatchExportResult>> {
+    var configJson = JSON.stringify(config);
+    return this.evalScript<BatchExportResult>(
+      "$.HostScript.batchExport('" + this.escapeForSingleQuotedString(configJson) + "')"
+    );
   }
 }
 

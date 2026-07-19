@@ -34,8 +34,14 @@ export function getDocumentPath(): string {
   try {
     if (app.documents.length === 0) return "__NO_DOCUMENT__";
     var doc = Document.activeDocument();
-    var docPath = doc.path();
-    return JSON.stringify({ path: docPath || "" });
+    var fileObj = doc.path();
+    var pathStr = "";
+    if (fileObj) {
+      // File 对象需取 fsName 才是字符串路径
+      // @ts-ignore
+      pathStr = fileObj.fsName || fileObj.toString() || "";
+    }
+    return JSON.stringify({ path: pathStr });
   } catch (e) {
     return "__ERROR__:" + e;
   }

@@ -4,14 +4,25 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 
 ## 功能特性
 
-- **图层导出**：支持将 PS 文档中的图层导出为独立图片文件
-- **格式支持**：支持 PNG、JPEG、BMP 等常见图片格式导出
-- **批量处理**：支持批量选择和导出多个图层
-- **面板 UI**：Vue 3 构建的交互面板，操作直观
-- **调试面板**：内置可收起的通信日志查看器（含耗时显示）
+### 批量导出
+
+选中 PS 文本图层，将每个字符（如 0-9、冒号）一键导出为统一画布尺寸的 web 素材：
+
+- **字体信息检测**：自动读取选中文本图层的字体、字号、颜色、加粗/斜体、缩放、行距等完整样式
+- **逐字符批量导出**：配置任意导出字符集合和文件名前缀，输出为 PNG 或 JPG 格式
+- **两种画布模式**：自动检测（以最大字符宽高 + 可配置边距作为画布）或手动指定宽高
+- **9 点锚位对齐**：3×3 网格 + 下拉框，支持左上/居中/右下等对齐方式
+- **图层轮询**：每 1 秒自动检测选中图层变化，切换图层后即时更新
+- **导出结果卡片**：显示文件数、检测尺寸、最终画布、输出路径
+- **Tab 导航**：双 tab 布局（「图层工具」「批量导出」），选中状态持久化到本地存储
+
+### 基础设施
+
+- **面板 UI**：Vue 3 SFC + TypeScript，暗色主题，可折叠卡片
+- **调试面板**：内置通信日志查看器（实时显示 send/receive/error + 耗时）
 - **Toast 提示**：操作反馈动画提示
 - **自动化脚本**：安装/卸载/打包/发布（`pkg` 生成独立可执行文件）
-- **跨平台**：支持 Windows/macOS，PS 2019 (v20.0) 及以上
+- **跨平台**：支持 Windows/macOS，兼容 PS 2019 (v20.0) 及以上
 
 ## 技术栈
 
@@ -33,11 +44,15 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   │   ├── DocInfo.vue           # 文档信息（通信链示例）
 │   │   ├── StatusBar.vue         # 状态栏
 │   │   ├── Toast.vue             # Toast 提示
-│   │   └── DebugPanel.vue        # 调试面板
+│   │   ├── DebugPanel.vue        # 调试面板
+│   │   ├── TabBar.vue            # Tab 导航栏
+│   │   ├── BatchExportTab.vue    # 批量导出 Tab
+│   │   ├── SectionCollapsible.vue # 可折叠卡片
+│   │   └── AnchorGrid.vue        # 锚点网格选择器
 │   ├── composables/
 │   │   └── useToast.ts           # Toast
 │   ├── types/
-│   │   ├── index.ts              # 共享类型
+│   │   ├── index.ts              # 共享类型（AnchorType, TextLayerInfo, BatchExportConfig 等）
 │   │   └── cep-panel.d.ts        # CEP 面板类型声明
 │   ├── vue-shims.d.ts            # Vue SFC 类型声明
 │   ├── jsx/
@@ -46,7 +61,8 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   │   │   ├── types.d.ts        # ActionManager 类型
 │   │   │   ├── utils.ts          # 工具函数
 │   │   │   ├── document.ts       # 文档/图层查询
-│   │   │   └── fileOps.ts        # 文件操作
+│   │   │   ├── fileOps.ts        # 文件操作
+│   │   │   └── batchExport.ts    # 批量导出（文本检测 + 字符测量 + 批量导出）
 │   │   └── ps-api/               # photoshop-script-api（vendored）
 │   ├── lib/
 │   │   └── CSInterface.js        # Adobe CEP 库（v9.4.0）
