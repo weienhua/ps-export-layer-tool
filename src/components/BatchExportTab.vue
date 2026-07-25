@@ -286,6 +286,7 @@ async function detectSize() {
       verticalScale: fontInfo.value.verticalScale,
       autoLeading: fontInfo.value.autoLeading,
       lineHeight: fontInfo.value.lineHeight,
+      effects: fontInfo.value.effects,
     };
     var result = await psBridge.measureCharacters(config);
     if (result.success && result.data) {
@@ -378,6 +379,7 @@ async function startExport() {
     verticalScale: info.verticalScale,
     autoLeading: info.autoLeading,
     lineHeight: info.lineHeight,
+    effects: info.effects,
   };
 
   // 4. 执行导出

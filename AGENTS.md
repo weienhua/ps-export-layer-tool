@@ -115,6 +115,7 @@ $.HostScript = {
 | `CSInterface is not defined` | `dist/lib/CSInterface.js` 缺失 |
 | `EvalScript error`（所有调用均失败） | ps-api 类从 `lib/` 子路径导入导致 webpack 模块冲突，须统一从 `ps-api/src/index.ts` 导入 |
 | JSX 修改不生效 | PS 缓存旧脚本，需重启 PS |
+| 文本图层颜色显示为黑色 | ActionDescriptor 中颜色值存储在浮点数格式（`redFloat`/`greenFloat`/`blueFloat`），若只读取整数格式（`red`/`grain`/`blue`）会导致颜色错误 |
 
 ## 更多信息
 

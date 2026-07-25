@@ -167,6 +167,43 @@ Promise<PSResult<T>>
   - `"__CANCEL__"` → 用户取消操作（如文件夹选择对话框）
   - `"__ERROR__:<msg>"` → 运行时异常
 
+### 颜色值格式处理
+
+在读取 ActionDescriptor 中的颜色值时，需要同时支持整数格式和浮点数格式：
+
+- **整数格式**：`red`/`grain`/`blue`，范围 0-255
+- **浮点数格式**：`redFloat`/`greenFloat`/`blueFloat`，范围 0.0-1.0
+
+**处理策略**：优先检查浮点数格式，再检查整数格式。浮点数需要乘以 255 并四舍五入转换为整数。
+
+**示例代码**：
+```typescript
+// 优先检查浮点数格式（文本图层使用此格式）
+if (desc.hasKey(app.stringIDToTypeID("redFloat"))) {
+    const r = desc.getDouble(app.stringIDToTypeID("redFloat"));
+    const g = desc.getDouble(app.stringIDToTypeID("greenFloat"));
+    const b = desc.getDouble(app.stringIDToTypeID("blueFloat"));
+    return new SolidColor(
+        Math.min(Math.round(r * 255), 255),
+        Math.min(Math.round(g * 255), 255),
+        Math.min(Math.round(b * 255), 255)
+    );
+}
+// 再检查整数格式（其他图层类型使用此格式）
+if (desc.hasKey(app.stringIDToTypeID("red"))) {
+    const red = desc.getDouble(app.stringIDToTypeID("red"));
+    const green = desc.getDouble(app.stringIDToTypeID("grain"));
+    const blue = desc.getDouble(app.stringIDToTypeID("blue"));
+    return new SolidColor(red, green, blue);
+}
+```
+
+**注意事项**：
+- 使用 `getDouble()` 读取浮点数，而不是 `getInteger()`
+- 浮点数转换后需要限制在 0-255 范围内，使用 `Math.min(Math.round(x * 255), 255)`
+- 整数格式的绿色键名为 `grain`（历史遗留问题），而非 `green`
+- 文本图层的颜色通常存储在浮点数格式中，若只读取整数格式会导致颜色显示为黑色
+
 ### 面板通信约定（src/bridge.ts）
 
 所有 PS 通信必须经过 `PSBridge`，禁止在 Vue 组件中直接调用 `CSInterface`。
