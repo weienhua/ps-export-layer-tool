@@ -200,6 +200,48 @@ export class PSBridge {
   }
 
   /**
+   * 读取文件内容
+   * @param filePath 文件路径
+   */
+  async readFile(filePath: string): Promise<PSResult<string>> {
+    var safePath = this.escapeForSingleQuotedString(filePath);
+    return this.evalScript<string>(
+      "$.HostScript.readFile('" + safePath + "')"
+    );
+  }
+
+  /**
+   * 写入文件内容
+   * @param filePath 文件路径
+   * @param content 文件内容
+   */
+  async writeFile(filePath: string, content: string): Promise<PSResult<void>> {
+    var safePath = this.escapeForSingleQuotedString(filePath);
+    var safeContent = this.escapeForSingleQuotedString(content);
+    return this.evalScript<void>(
+      "$.HostScript.writeFile('" + safePath + "', '" + safeContent + "')"
+    );
+  }
+
+  /**
+   * 确保目录存在
+   * @param dirPath 目录路径
+   */
+  async ensureDirectory(dirPath: string): Promise<PSResult<void>> {
+    var safePath = this.escapeForSingleQuotedString(dirPath);
+    return this.evalScript<void>(
+      "$.HostScript.ensureDirectory('" + safePath + "')"
+    );
+  }
+
+  /**
+   * 获取插件扩展目录路径
+   */
+  async getExtensionPath(): Promise<PSResult<{ path: string }>> {
+    return this.evalScript<{ path: string }>("$.HostScript.getExtensionPath()");
+  }
+
+  /**
    * 批量导出文本图层中的每个字符为独立图片
    * @param config 导出配置
    * @returns Promise 封装的结果

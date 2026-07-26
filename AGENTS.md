@@ -25,9 +25,9 @@ npm run package            # 生产模式构建 + 打包发布文件（zip + 安
 
 - 面板侧: Vue 3 SFC 组件化架构
   - 入口: `src/main.ts` → `src/App.vue`
-  - 组件: `src/components/*.vue`（`<script setup lang="ts">`），含 TabBar、BatchExportTab、SectionCollapsible、AnchorGrid 等
-  - 组合式函数: `src/composables/*.ts`
-  - 共享类型: `src/types/index.ts`（AnchorType, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig, BatchExportResult）
+  - 组件: `src/components/*.vue`（`<script setup lang="ts">`），含 TabBar、BatchExportTab、ExportPresetList、SectionCollapsible、AnchorGrid 等
+  - 组合式函数: `src/composables/useToast.ts`、`useExportPreset.ts`、`settings.ts`
+  - 共享类型: `src/types/index.ts`（AnchorType, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig(items代替characters), BatchExportResult, ExportPreset, ExportPresetItem）
 - 宿主侧: `src/jsx/hostscript.ts` + `src/jsx/modules/` → webpack(ts-loader, target: ES3) → `dist/jsx/hostscript.js`
   - 入口: `src/jsx/hostscript.ts`（import + $.HostScript 注册）
   - 模块: `src/jsx/modules/`（utils、document、fileOps、batchExport）
@@ -51,9 +51,13 @@ $.HostScript = {
   getDocumentInfo,      // 文档信息
   getDocumentPath,      // 文档路径（File.fsName）
   getTextLayerInfo,     // 选中文本图层字体/颜色/样式
-  measureCharacters,    // 测量字符宽高
-  batchExport,          // 完整批量导出
+  measureCharacters,    // 测量字符宽高（items 数组）
+  batchExport,          // 批量导出（items 数组，name fallback 到 sanitize）
   selectFolderDialog,   // 文件夹选择对话框
+  readFile,             // 读取文件内容
+  writeFile,            // 写入文件内容
+  ensureDirectory,      // 确保目录存在
+  getExtensionPath,     // 获取扩展目录路径
 };
 ```
 
@@ -129,7 +133,8 @@ $.HostScript = {
 | Layer.id 报错 "not callable" | `layer.id` 是**属性**（数字），不是方法，使用 `layer.id` 而非 `layer.id()` |
 | bounds() vs boundsNoEffects() | 必须使用 `bounds()`（包含图层效果范围），`boundsNoEffects()` 仅测量文本内容不含效果 |
 | 手动模式仍执行测量 | 手动模式（`sizeMode==="manual"`）已优化跳过 Phase 2 测量，直接进入导出阶段 |
-| 边距默认值 | 默认边距 `paddingW=10, paddingH=10`，修改后持久化到 localStorage（key: `exportLayerTool.paddingW.v1` / `exportLayerTool.paddingH.v1`） |
+| 边距默认值 | 默认边距 `paddingW=10, paddingH=10`，保存在预设中 |
+| 预设文件被覆盖 | `load()` 不再回写 bundle 数据，预设仅来自文件 + localStorage |
 
 ## 更多信息
 

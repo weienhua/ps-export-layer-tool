@@ -24,19 +24,24 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   │   ├── Toast.vue          # Toast 提示（provide/inject）
 │   │   ├── DebugPanel.vue     # 调试面板（通信日志）
 │   │   ├── TabBar.vue         # Tab 导航栏
-│   │   ├── BatchExportTab.vue # 批量导出 Tab（文本图层字符批量导出为 web 素材）
+│   │   ├── BatchExportTab.vue # 批量导出 Tab（预设系统 + items 编辑 + 一键导出）
+│   │   ├── ExportPresetList.vue # 预设卡片列表（拖拽排序 + hover 预览）
 │   │   ├── SectionCollapsible.vue # 可折叠卡片区域（折叠状态持久化到 localStorage）
 │   │   └── AnchorGrid.vue     # 3×3 锚点网格选择器 + 下拉框
 │   ├── composables/
-│   │   └── useToast.ts        # Toast composable（inject）
+│   │   ├── useToast.ts        # Toast composable（inject）
+│   │   ├── useExportPreset.ts # 预设 CRUD（文件 + localStorage 双写）
+│   │   └── settings.ts        # 面板设置统一持久化（localStorage）
 │   ├── types/
-│   │   ├── index.ts           # 共享类型：AnchorType, ExportFormat, TextLayerInfo, BatchExportConfig, BatchExportResult 等
+│   │   ├── index.ts           # 共享类型：AnchorType, ExportFormat, TextLayerInfo, BatchExportConfig(items代替characters), BatchExportResult, ExportPreset, ExportPresetItem 等
 │   │   └── cep-panel.d.ts     # CSInterface 全局类型（最小化声明）
 │   ├── bridge.ts              # evalScript 封装，Promise 化通信 + 日志回调
 │   ├── index.html             # 精简版 HTML（挂载点 + CSInterface + bundle）
 │   └── style.css              # 全局基础样式（reset、CSS 变量、按钮、表单）
 │   ├── lib/
-│   │   └── CSInterface.js     # Adobe 官方 CEP 库 v9.4.0，不要修改，构建时原样复制
+│   │   ├── CSInterface.js     # Adobe 官方 CEP 库 v9.4.0，不要修改，构建时原样复制
+│   │   └── presets/
+│   │       └── default.json   # 内置预设种子数据，构建时复制到 dist/
 │   ├── vue-shims.d.ts         # Vue SFC 类型声明
 │   └── jsx/
 │       ├── hostscript.ts      # 宿主脚本入口（import + $.HostScript 注册）
@@ -256,6 +261,10 @@ src/jsx/
 | `measureCharacters(configJson)` | batchExport.ts | 测量字符宽高，返回 maxWidth/maxHeight |
 | `batchExport(configJson)` | batchExport.ts | 完整批量导出（测量 + 导出） |
 | `selectFolderDialog()` | fileOps.ts | 原生文件夹选择对话框 |
+| `readFile(path)` | fileOps.ts | 读取文件内容 |
+| `writeFile(path, content)` | fileOps.ts | 写入文件内容 |
+| `ensureDirectory(path)` | fileOps.ts | 确保目录存在 |
+| `getExtensionPath()` | fileOps.ts | 获取扩展目录路径 |
 
 ```typescript
 // 在对应模块文件中定义并导出函数（如 modules/document.ts）
@@ -299,21 +308,28 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 
 ### Tab 布局
 
-- **TabBar**：双 tab 导航（「图层工具」「批量导出」），选中状态持久化到 `localStorage`（key: `exportLayerTool.activeTab.v1`）
+- **TabBar**：双 tab 导航（「图层工具」「批量导出」），选中状态持久化到 `exportLayerTool.settings.v1`
 - **图层工具** tab：占位（后续扩展）
 
 ### 批量导出 Tab（BatchExportTab）
 
-选中 PS 文本图层后，一键将每个字符导出为统一画布尺寸的 web 素材（PNG/JPG）。
+选中 PS 文本图层后，通过预设系统 + 可编辑导出项列表，将每个渲染文本导出为统一画布尺寸的 web 素材（PNG/JPG）。
 
 **核心流程**：
-1. 轮询检测选中图层（有文档 1s 间隔，无文档停止）→ 自动读取字体/字号/颜色/样式/抗锯齿/图层效果
-2. 配置导出字符、文件名前缀、画布尺寸（自动检测 + 边距 或 手动输入）、对齐方式（9 点锚位）
-3. 自动默认路径为 PSD 所在目录下的 `output/` 子文件夹
-4. 点击「开始导出」→ 自动模式：测量每个字符最大宽高 → 以统一画布逐字符导出；手动模式：直接以指定尺寸逐字符导出（跳过测量阶段）
+1. 轮询检测选中图层 → 自动读取字体/字号/颜色/样式/抗锯齿/图层效果
+2. 选择预设（22 个内置预设，支持自定义）自动填充导出项列表和配置
+3. 编辑导出项（渲染文本 + 文件后缀）、文件名前缀、画布尺寸、对齐方式
+4. 点击「开始导出」或开启「应用后自动导出」→ 逐项导出
+
+**预设系统**：
+- 预设卡片列表（底部），支持拖拽排序、hover 预览、自动导出开关
+- 预设存储完整配置（items + prefix + format + anchor + paddingW/H）
+- 数据存储：`dist/lib/presets/default.json` + localStorage `exportLayerTool.presets.v1`
+- 面板设置统一存储：`exportLayerTool.settings.v1`
 
 **子组件**：
-- **SectionCollapsible**：可折叠卡片，状态持久化到 `localStorage`（key: `exportLayerTool.sectionStates.v1`）。参考 ps-layer-tool 设计
+- **ExportPresetList**：预设卡片列表（拖拽排序 + hover 预览 + 预览开关）
+- **SectionCollapsible**：可折叠卡片，状态持久化到 localStorage
 - **AnchorGrid**：3×3 锚点网格 + 下拉选择器
 
 ### 其他基础组件
@@ -420,8 +436,9 @@ Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.11" -Name "PlayerDebugMode" -V
 | Layer.id 报错 "not callable" | `layer.id` 是属性（数字），不是方法 | 使用 `layer.id` 而非 `layer.id()` |
 | 超大字号测量失败 | 工作文档硬编码 2000×2000 | 使用 `calcWorkDocSize(fontSize)` 动态计算 |
 | 手动模式导出慢 | 仍执行完整测量流程 | 手动模式跳过 Phase 2，直接进入导出 |
-| 边距太小导致裁切 | 默认 `paddingW=2, paddingH=3` | 默认改为 10/10，且持久化到 localStorage |
+| 边距太小导致裁切 | 默认 `paddingW=2, paddingH=3` | 默认改为 10/10，保存在预设中 |
 | 抗锯齿不一致 | 导出素材边缘不平滑 | 从原图层读取 antiAlias 并应用 |
+| 预设文件被覆盖 | `load()` 从 bundle 写入文件 | 不再内置回写，数据仅来自文件 + localStorage |
 
 ## 会话交接约定
 

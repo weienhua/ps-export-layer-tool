@@ -1,0 +1,1172 @@
+[
+  {
+    "id": "builtin-number-0-9",
+    "name": "数字",
+    "items": [
+      {
+        "text": "0",
+        "name": "0"
+      },
+      {
+        "text": "1",
+        "name": "1"
+      },
+      {
+        "text": "2",
+        "name": "2"
+      },
+      {
+        "text": "3",
+        "name": "3"
+      },
+      {
+        "text": "4",
+        "name": "4"
+      },
+      {
+        "text": "5",
+        "name": "5"
+      },
+      {
+        "text": "6",
+        "name": "6"
+      },
+      {
+        "text": "7",
+        "name": "7"
+      },
+      {
+        "text": "8",
+        "name": "8"
+      },
+      {
+        "text": "9",
+        "name": "9"
+      }
+    ],
+    "prefix": "sz_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-time-digit-symbol",
+    "name": "时间-数字符号",
+    "items": [
+      {
+        "text": "0",
+        "name": "0"
+      },
+      {
+        "text": "1",
+        "name": "1"
+      },
+      {
+        "text": "2",
+        "name": "2"
+      },
+      {
+        "text": "3",
+        "name": "3"
+      },
+      {
+        "text": "4",
+        "name": "4"
+      },
+      {
+        "text": "5",
+        "name": "5"
+      },
+      {
+        "text": "6",
+        "name": "6"
+      },
+      {
+        "text": "7",
+        "name": "7"
+      },
+      {
+        "text": "8",
+        "name": "8"
+      },
+      {
+        "text": "9",
+        "name": "9"
+      },
+      {
+        "text": ":",
+        "name": "dot1"
+      },
+      {
+        "text": "-",
+        "name": "dot2"
+      },
+      {
+        "text": "/",
+        "name": "dot3"
+      },
+      {
+        "text": "时",
+        "name": "dot4"
+      },
+      {
+        "text": "分",
+        "name": "dot5"
+      },
+      {
+        "text": "秒",
+        "name": "dot6"
+      }
+    ],
+    "prefix": "time_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-time-chinese",
+    "name": "时间-中文",
+    "items": [
+      {
+        "text": "零",
+        "name": "0"
+      },
+      {
+        "text": "一",
+        "name": "1"
+      },
+      {
+        "text": "二",
+        "name": "2"
+      },
+      {
+        "text": "三",
+        "name": "3"
+      },
+      {
+        "text": "四",
+        "name": "4"
+      },
+      {
+        "text": "五",
+        "name": "5"
+      },
+      {
+        "text": "六",
+        "name": "6"
+      },
+      {
+        "text": "七",
+        "name": "7"
+      },
+      {
+        "text": "八",
+        "name": "8"
+      },
+      {
+        "text": "九",
+        "name": "9"
+      },
+      {
+        "text": "十",
+        "name": "10"
+      },
+      {
+        "text": "时",
+        "name": "dot1"
+      },
+      {
+        "text": "分",
+        "name": "dot2"
+      },
+      {
+        "text": "秒",
+        "name": "dot3"
+      }
+    ],
+    "prefix": "time_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-date-digit-symbol",
+    "name": "日期-数字符号",
+    "items": [
+      {
+        "text": "0",
+        "name": "0"
+      },
+      {
+        "text": "1",
+        "name": "1"
+      },
+      {
+        "text": "2",
+        "name": "2"
+      },
+      {
+        "text": "3",
+        "name": "3"
+      },
+      {
+        "text": "4",
+        "name": "4"
+      },
+      {
+        "text": "5",
+        "name": "5"
+      },
+      {
+        "text": "6",
+        "name": "6"
+      },
+      {
+        "text": "7",
+        "name": "7"
+      },
+      {
+        "text": "8",
+        "name": "8"
+      },
+      {
+        "text": "9",
+        "name": "9"
+      },
+      {
+        "text": ".",
+        "name": "dot1"
+      },
+      {
+        "text": "-",
+        "name": "dot2"
+      },
+      {
+        "text": "/",
+        "name": "dot3"
+      },
+      {
+        "text": "月",
+        "name": "dot4"
+      },
+      {
+        "text": "日",
+        "name": "dot5"
+      }
+    ],
+    "prefix": "date_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-date-chinese",
+    "name": "日期-中文",
+    "items": [
+      {
+        "text": "零",
+        "name": "0"
+      },
+      {
+        "text": "一",
+        "name": "1"
+      },
+      {
+        "text": "二",
+        "name": "2"
+      },
+      {
+        "text": "三",
+        "name": "3"
+      },
+      {
+        "text": "四",
+        "name": "4"
+      },
+      {
+        "text": "五",
+        "name": "5"
+      },
+      {
+        "text": "六",
+        "name": "6"
+      },
+      {
+        "text": "七",
+        "name": "7"
+      },
+      {
+        "text": "八",
+        "name": "8"
+      },
+      {
+        "text": "九",
+        "name": "9"
+      },
+      {
+        "text": "十",
+        "name": "10"
+      },
+      {
+        "text": "年",
+        "name": "dot1"
+      },
+      {
+        "text": "月",
+        "name": "dot2"
+      },
+      {
+        "text": "日",
+        "name": "dot3"
+      }
+    ],
+    "prefix": "date_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-week-cn-full",
+    "name": "周-中文全称",
+    "items": [
+      {
+        "text": "星期日",
+        "name": "1"
+      },
+      {
+        "text": "星期一",
+        "name": "2"
+      },
+      {
+        "text": "星期二",
+        "name": "3"
+      },
+      {
+        "text": "星期三",
+        "name": "4"
+      },
+      {
+        "text": "星期四",
+        "name": "5"
+      },
+      {
+        "text": "星期五",
+        "name": "6"
+      },
+      {
+        "text": "星期六",
+        "name": "7"
+      }
+    ],
+    "prefix": "week_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-week-cn-short",
+    "name": "周-中文简称",
+    "items": [
+      {
+        "text": "周日",
+        "name": "1"
+      },
+      {
+        "text": "周一",
+        "name": "2"
+      },
+      {
+        "text": "周二",
+        "name": "3"
+      },
+      {
+        "text": "周三",
+        "name": "4"
+      },
+      {
+        "text": "周四",
+        "name": "5"
+      },
+      {
+        "text": "周五",
+        "name": "6"
+      },
+      {
+        "text": "周六",
+        "name": "7"
+      }
+    ],
+    "prefix": "week_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-week-cn-xingqi",
+    "name": "周-星期X",
+    "items": [
+      {
+        "text": "星期1",
+        "name": "1"
+      },
+      {
+        "text": "星期2",
+        "name": "2"
+      },
+      {
+        "text": "星期3",
+        "name": "3"
+      },
+      {
+        "text": "星期4",
+        "name": "4"
+      },
+      {
+        "text": "星期5",
+        "name": "5"
+      },
+      {
+        "text": "星期6",
+        "name": "6"
+      },
+      {
+        "text": "星期天",
+        "name": "7"
+      }
+    ],
+    "prefix": "week_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-week-en-full",
+    "name": "周-英文全称",
+    "items": [
+      {
+        "text": "Sunday",
+        "name": "1"
+      },
+      {
+        "text": "Monday",
+        "name": "2"
+      },
+      {
+        "text": "Tuesday",
+        "name": "3"
+      },
+      {
+        "text": "Wednesday",
+        "name": "4"
+      },
+      {
+        "text": "Thursday",
+        "name": "5"
+      },
+      {
+        "text": "Friday",
+        "name": "6"
+      },
+      {
+        "text": "Saturday",
+        "name": "7"
+      }
+    ],
+    "prefix": "week_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-week-en-full-upper",
+    "name": "周-英文全称大写",
+    "items": [
+      {
+        "text": "SUNDAY",
+        "name": "1"
+      },
+      {
+        "text": "MONDAY",
+        "name": "2"
+      },
+      {
+        "text": "TUESDAY",
+        "name": "3"
+      },
+      {
+        "text": "WEDNESDAY",
+        "name": "4"
+      },
+      {
+        "text": "THURSDAY",
+        "name": "5"
+      },
+      {
+        "text": "FRIDAY",
+        "name": "6"
+      },
+      {
+        "text": "SATURDAY",
+        "name": "7"
+      }
+    ],
+    "prefix": "week_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-week-en-abbr",
+    "name": "周-英文缩写",
+    "items": [
+      {
+        "text": "Sun",
+        "name": "1"
+      },
+      {
+        "text": "Mon",
+        "name": "2"
+      },
+      {
+        "text": "Tue",
+        "name": "3"
+      },
+      {
+        "text": "Wed",
+        "name": "4"
+      },
+      {
+        "text": "Thu",
+        "name": "5"
+      },
+      {
+        "text": "Fri",
+        "name": "6"
+      },
+      {
+        "text": "Sat",
+        "name": "7"
+      }
+    ],
+    "prefix": "week_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-week-en-abbr-lower",
+    "name": "周-英文缩写小写",
+    "items": [
+      {
+        "text": "sun",
+        "name": "1"
+      },
+      {
+        "text": "mon",
+        "name": "2"
+      },
+      {
+        "text": "tue",
+        "name": "3"
+      },
+      {
+        "text": "wed",
+        "name": "4"
+      },
+      {
+        "text": "thu",
+        "name": "5"
+      },
+      {
+        "text": "fri",
+        "name": "6"
+      },
+      {
+        "text": "sat",
+        "name": "7"
+      }
+    ],
+    "prefix": "week_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-week-en-abbr-upper",
+    "name": "周-英文缩写大写",
+    "items": [
+      {
+        "text": "SUN",
+        "name": "1"
+      },
+      {
+        "text": "MON",
+        "name": "2"
+      },
+      {
+        "text": "TUE",
+        "name": "3"
+      },
+      {
+        "text": "WED",
+        "name": "4"
+      },
+      {
+        "text": "THU",
+        "name": "5"
+      },
+      {
+        "text": "FRI",
+        "name": "6"
+      },
+      {
+        "text": "SAT",
+        "name": "7"
+      }
+    ],
+    "prefix": "week_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-tiangan",
+    "name": "天干",
+    "items": [
+      {
+        "text": "甲",
+        "name": "1"
+      },
+      {
+        "text": "乙",
+        "name": "2"
+      },
+      {
+        "text": "丙",
+        "name": "3"
+      },
+      {
+        "text": "丁",
+        "name": "4"
+      },
+      {
+        "text": "戊",
+        "name": "5"
+      },
+      {
+        "text": "己",
+        "name": "6"
+      },
+      {
+        "text": "庚",
+        "name": "7"
+      },
+      {
+        "text": "辛",
+        "name": "8"
+      },
+      {
+        "text": "壬",
+        "name": "9"
+      },
+      {
+        "text": "癸",
+        "name": "10"
+      }
+    ],
+    "prefix": "tg_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-dizhi",
+    "name": "地支",
+    "items": [
+      {
+        "text": "子",
+        "name": "1"
+      },
+      {
+        "text": "丑",
+        "name": "2"
+      },
+      {
+        "text": "寅",
+        "name": "3"
+      },
+      {
+        "text": "卯",
+        "name": "4"
+      },
+      {
+        "text": "辰",
+        "name": "5"
+      },
+      {
+        "text": "巳",
+        "name": "6"
+      },
+      {
+        "text": "午",
+        "name": "7"
+      },
+      {
+        "text": "未",
+        "name": "8"
+      },
+      {
+        "text": "申",
+        "name": "9"
+      },
+      {
+        "text": "酉",
+        "name": "10"
+      },
+      {
+        "text": "戌",
+        "name": "11"
+      },
+      {
+        "text": "亥",
+        "name": "12"
+      }
+    ],
+    "prefix": "dz_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-shengxiao",
+    "name": "生肖",
+    "items": [
+      {
+        "text": "鼠",
+        "name": "1"
+      },
+      {
+        "text": "牛",
+        "name": "2"
+      },
+      {
+        "text": "虎",
+        "name": "3"
+      },
+      {
+        "text": "兔",
+        "name": "4"
+      },
+      {
+        "text": "龙",
+        "name": "5"
+      },
+      {
+        "text": "蛇",
+        "name": "6"
+      },
+      {
+        "text": "马",
+        "name": "7"
+      },
+      {
+        "text": "羊",
+        "name": "8"
+      },
+      {
+        "text": "猴",
+        "name": "9"
+      },
+      {
+        "text": "鸡",
+        "name": "10"
+      },
+      {
+        "text": "狗",
+        "name": "11"
+      },
+      {
+        "text": "猪",
+        "name": "12"
+      }
+    ],
+    "prefix": "sx_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-shichen",
+    "name": "时辰",
+    "items": [
+      {
+        "text": "子时",
+        "name": "1"
+      },
+      {
+        "text": "丑时",
+        "name": "2"
+      },
+      {
+        "text": "寅时",
+        "name": "3"
+      },
+      {
+        "text": "卯时",
+        "name": "4"
+      },
+      {
+        "text": "辰时",
+        "name": "5"
+      },
+      {
+        "text": "巳时",
+        "name": "6"
+      },
+      {
+        "text": "午时",
+        "name": "7"
+      },
+      {
+        "text": "未时",
+        "name": "8"
+      },
+      {
+        "text": "申时",
+        "name": "9"
+      },
+      {
+        "text": "酉时",
+        "name": "10"
+      },
+      {
+        "text": "戌时",
+        "name": "11"
+      },
+      {
+        "text": "亥时",
+        "name": "12"
+      }
+    ],
+    "prefix": "sc_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-lunar-month-full",
+    "name": "农历月-全称",
+    "items": [
+      {
+        "text": "正月",
+        "name": "1"
+      },
+      {
+        "text": "二月",
+        "name": "2"
+      },
+      {
+        "text": "三月",
+        "name": "3"
+      },
+      {
+        "text": "四月",
+        "name": "4"
+      },
+      {
+        "text": "五月",
+        "name": "5"
+      },
+      {
+        "text": "六月",
+        "name": "6"
+      },
+      {
+        "text": "七月",
+        "name": "7"
+      },
+      {
+        "text": "八月",
+        "name": "8"
+      },
+      {
+        "text": "九月",
+        "name": "9"
+      },
+      {
+        "text": "十月",
+        "name": "10"
+      },
+      {
+        "text": "冬月",
+        "name": "11"
+      },
+      {
+        "text": "腊月",
+        "name": "12"
+      }
+    ],
+    "prefix": "nly_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-lunar-month-single",
+    "name": "农历月-单字",
+    "items": [
+      {
+        "text": "正",
+        "name": "1"
+      },
+      {
+        "text": "二",
+        "name": "2"
+      },
+      {
+        "text": "三",
+        "name": "3"
+      },
+      {
+        "text": "四",
+        "name": "4"
+      },
+      {
+        "text": "五",
+        "name": "5"
+      },
+      {
+        "text": "六",
+        "name": "6"
+      },
+      {
+        "text": "七",
+        "name": "7"
+      },
+      {
+        "text": "八",
+        "name": "8"
+      },
+      {
+        "text": "九",
+        "name": "9"
+      },
+      {
+        "text": "十",
+        "name": "10"
+      },
+      {
+        "text": "冬",
+        "name": "11"
+      },
+      {
+        "text": "腊",
+        "name": "12"
+      },
+      {
+        "text": "月",
+        "name": "dot1"
+      }
+    ],
+    "prefix": "nly_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-lunar-day",
+    "name": "农历日",
+    "items": [
+      {
+        "text": "初",
+        "name": "0"
+      },
+      {
+        "text": "一",
+        "name": "1"
+      },
+      {
+        "text": "二",
+        "name": "2"
+      },
+      {
+        "text": "三",
+        "name": "3"
+      },
+      {
+        "text": "四",
+        "name": "4"
+      },
+      {
+        "text": "五",
+        "name": "5"
+      },
+      {
+        "text": "六",
+        "name": "6"
+      },
+      {
+        "text": "七",
+        "name": "7"
+      },
+      {
+        "text": "八",
+        "name": "8"
+      },
+      {
+        "text": "九",
+        "name": "9"
+      },
+      {
+        "text": "十",
+        "name": "10"
+      },
+      {
+        "text": "廿",
+        "name": "20"
+      },
+      {
+        "text": "闰",
+        "name": "run"
+      }
+    ],
+    "prefix": "nlr_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-cn-upper-num",
+    "name": "中文大写数字",
+    "items": [
+      {
+        "text": "零",
+        "name": "0"
+      },
+      {
+        "text": "壹",
+        "name": "1"
+      },
+      {
+        "text": "贰",
+        "name": "2"
+      },
+      {
+        "text": "叁",
+        "name": "3"
+      },
+      {
+        "text": "肆",
+        "name": "4"
+      },
+      {
+        "text": "伍",
+        "name": "5"
+      },
+      {
+        "text": "陆",
+        "name": "6"
+      },
+      {
+        "text": "柒",
+        "name": "7"
+      },
+      {
+        "text": "捌",
+        "name": "8"
+      },
+      {
+        "text": "玖",
+        "name": "9"
+      },
+      {
+        "text": "拾",
+        "name": "10"
+      }
+    ],
+    "prefix": "sz_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  },
+  {
+    "id": "builtin-xingzuo",
+    "name": "星座",
+    "items": [
+      {
+        "text": "白羊座",
+        "name": "1"
+      },
+      {
+        "text": "金牛座",
+        "name": "2"
+      },
+      {
+        "text": "双子座",
+        "name": "3"
+      },
+      {
+        "text": "巨蟹座",
+        "name": "4"
+      },
+      {
+        "text": "狮子座",
+        "name": "5"
+      },
+      {
+        "text": "处女座",
+        "name": "6"
+      },
+      {
+        "text": "天秤座",
+        "name": "7"
+      },
+      {
+        "text": "天蝎座",
+        "name": "8"
+      },
+      {
+        "text": "射手座",
+        "name": "9"
+      },
+      {
+        "text": "摩羯座",
+        "name": "10"
+      },
+      {
+        "text": "水瓶座",
+        "name": "11"
+      },
+      {
+        "text": "双鱼座",
+        "name": "12"
+      }
+    ],
+    "prefix": "xz_",
+    "format": "png",
+    "anchor": "middle-center",
+    "paddingW": 10,
+    "paddingH": 10
+  }
+]

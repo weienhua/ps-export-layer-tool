@@ -13,10 +13,10 @@ const { execSync } = require('child_process');
 
 const EXTENSION_ID = 'com.ps.export.layer.tool';
 const CSXS_VERSIONS = [6, 7, 8, 9, 10, 11];
-// 安装时需要保留的用户文件（相对于 lib/ 目录）
-const LIB_KEEP_FILES = [];
+// 安装时需要保留的用户文件（相对于 dist/lib/ 目录）
+const LIB_KEEP_FILES = ['presets/default.json'];
 // 安装时需要保留的用户目录（相对于 dist/lib/ 目录）
-const LIB_KEEP_DIRS = [];
+const LIB_KEEP_DIRS = ['presets'];
 // 备份目录中的用户文件和目录（相对于备份目录根）
 const BACKUP_KEEP_FILES = LIB_KEEP_FILES;
 const BACKUP_KEEP_DIRS = LIB_KEEP_DIRS;
@@ -505,15 +505,8 @@ function main() {
     }
   }
 
-  // 6. 如果用户之前没有 presets 目录，删除安装包中的默认 presets 目录
-  // 这样可以避免覆盖用户数据，预设会在用户首次使用时自动创建
-  if (!hadPresetsDir) {
-    const defaultPresetsDir = path.join(targetDir, 'dist', 'lib', 'presets');
-    if (fs.existsSync(defaultPresetsDir)) {
-      rmrfSync(defaultPresetsDir);
-      log('用户之前无预设文件，已删除默认预设目录', 'info');
-    }
-  }
+  // 6. 预设文件 default.json 随安装包自带，安装后直接可用
+  // 用户修改过的预设在上面的备份恢复步骤中已保留，无需额外处理
 
   // 6. 开启调试模式
   if (isWin) {

@@ -429,7 +429,7 @@ export function batchExport(configJson: string): string {
     }
 
     var config = JSON.parse(configJson);
-    var characters = config.characters;
+    var items = config.items;
     var prefix = config.prefix;
     var format = config.format;
     var sizeMode = config.sizeMode;
@@ -462,7 +462,8 @@ export function batchExport(configJson: string): string {
     var workDoc = Document.create("_batch", workDocSize, workDocSize, 72, false, false);
 
     var measuredChars: Array<{
-      character: string;
+      text: string;
+      name: string;
       x: number;
       y: number;
       w: number;
@@ -473,10 +474,11 @@ export function batchExport(configJson: string): string {
 
     // ==================== Phase 2: 逐字符测量（仅自动模式） ====================
     if (sizeMode === "auto") {
-      for (var i = 0; i < characters.length; i++) {
-        var ch = characters.charAt(i);
+      for (var i = 0; i < items.length; i++) {
+        var itemText = items[i].text;
+        var itemName = items[i].name || sanitizeFilenameChar(itemText);
 
-        var text = createTextLayer(ch, config);
+        var text = createTextLayer(itemText, config);
         text.paint();
 
         var layer = Layer.getSelectedLayers()[0];
@@ -495,7 +497,8 @@ export function batchExport(configJson: string): string {
         var charH = Math.ceil(bounds.height);
 
         measuredChars.push({
-          character: ch,
+          text: itemText,
+          name: itemName,
           x: bounds.x,
           y: bounds.y,
           w: charW,
@@ -552,10 +555,11 @@ export function batchExport(configJson: string): string {
       // 自动模式：遍历测量结果
       for (var j = 0; j < measuredChars.length; j++) {
         var measured = measuredChars[j];
-        var ch2 = measured.character;
+        var expTextStr = measured.text;
+        var expName = measured.name;
 
         // 创建文本图层
-        var exportText = createTextLayer(ch2, config);
+        var exportText = createTextLayer(expTextStr, config);
         exportText.paint();
 
         var exportLayer = Layer.getSelectedLayers()[0];
@@ -611,8 +615,7 @@ export function batchExport(configJson: string): string {
         translateLayerBy(translateX, translateY);
 
         // 导出文件名
-        var safeChar = sanitizeFilenameChar(ch2);
-        var filename = prefix + safeChar + ext;
+        var filename = prefix + expName + ext;
 
         // 使用 exportToWeb 导出
         if (isPng) {
@@ -639,12 +642,13 @@ export function batchExport(configJson: string): string {
         exportCount++;
       }
     } else {
-      // 手动模式：直接遍历字符，跳过单独测量阶段
-      for (var k = 0; k < characters.length; k++) {
-        var ch3 = characters.charAt(k);
+      // 手动模式：直接遍历 items，跳过单独测量阶段
+      for (var k = 0; k < items.length; k++) {
+        var itemText2 = items[k].text;
+        var itemName2 = items[k].name || sanitizeFilenameChar(itemText2);
 
         // 创建文本图层
-        var exportText2 = createTextLayer(ch3, config);
+        var exportText2 = createTextLayer(itemText2, config);
         exportText2.paint();
 
         var exportLayer2 = Layer.getSelectedLayers()[0];
@@ -706,8 +710,7 @@ export function batchExport(configJson: string): string {
         translateLayerBy(translateX2, translateY2);
 
         // 导出文件名
-        var safeChar2 = sanitizeFilenameChar(ch3);
-        var filename2 = prefix + safeChar2 + ext;
+        var filename2 = prefix + itemName2 + ext;
 
         // 使用 exportToWeb 导出
         if (isPng) {
@@ -776,7 +779,7 @@ export function measureCharacters(configJson: string): string {
     }
 
     var config = JSON.parse(configJson);
-    var characters = config.characters;
+    var items = config.items;
 
     // 读取原图层效果，与 batchExport Phase 2 保持一致
     var originalLayerEffects: any = null;
@@ -796,8 +799,8 @@ export function measureCharacters(configJson: string): string {
     var maxW = 0;
     var maxH = 0;
 
-    for (var i = 0; i < characters.length; i++) {
-      var ch = characters.charAt(i);
+    for (var i = 0; i < items.length; i++) {
+      var ch = items[i].text;
 
       var text = createTextLayer(ch, config);
       text.paint();

@@ -4,6 +4,28 @@
  */
 
 /**
+ * 导出预设项：渲染文本与文件命名的解耦
+ */
+export interface ExportPresetItem {
+  text: string;   // PS 中渲染的文本内容
+  name?: string;  // 文件名标识，空则 fallback 到 sanitize(text)
+}
+
+/**
+ * 导出预设卡片数据（持久化 + UI 用）
+ */
+export interface ExportPreset {
+  id: string;
+  name: string;
+  items: ExportPresetItem[];
+  prefix: string;
+  format: ExportFormat;
+  anchor: AnchorType;
+  paddingW: number;
+  paddingH: number;
+}
+
+/**
  * 9 点锚位类型（Position Anchor）
  * 定义图层的参考点位置
  */
@@ -98,7 +120,7 @@ export interface TextLayerInfo {
  * 批量导出配置（面板 → 宿主）
  */
 export interface BatchExportConfig {
-  characters: string;
+  items: ExportPresetItem[];
   prefix: string;
   format: ExportFormat;
   sizeMode: SizeMode;

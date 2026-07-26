@@ -51,6 +51,7 @@ module.exports = (env, argv) => {
         patterns: [
           { from: 'src/index.html', to: 'index.html' },
           { from: 'src/lib/CSInterface.js', to: 'lib/CSInterface.js' },
+          { from: 'src/lib/presets', to: 'lib/presets' },
         ],
       }),
     ],

@@ -33,22 +33,11 @@ import BatchExportTab from "./components/BatchExportTab.vue";
 // 状态管理
 const statusMsg = ref("就绪");
 const statusError = ref(false);
-// 从 localStorage 恢复上次的 tab 选择
-function loadActiveTab(): string {
-  try {
-    var saved = localStorage.getItem("exportLayerTool.activeTab.v1");
-    if (saved === "layers" || saved === "batch") return saved;
-  } catch { /* ignore */ }
-  return "batch";
-}
-const activeTab = ref(loadActiveTab());
+import { getSetting, setSetting } from "./composables/settings";
 
-// tab 切换时持久化
-watch(activeTab, function (val) {
-  try {
-    localStorage.setItem("exportLayerTool.activeTab.v1", val);
-  } catch { /* ignore */ }
-});
+const activeTab = ref(getSetting("activeTab", "batch"));
+
+watch(activeTab, function (val) { setSetting("activeTab", val); });
 
 // 响应式紧凑模式（容器宽度 < 360px 时启用简写标签）
 const containerRef = ref<HTMLElement | null>(null);

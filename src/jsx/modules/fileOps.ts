@@ -172,8 +172,9 @@ export function listFiles(dirPath: string, filter: string): string {
 export function getExtensionPath(): string {
   try {
     // @ts-ignore
-    return $.fileName ? new File($.fileName).parent.parent.fsName : "";
+    var path = $.fileName ? new File($.fileName).parent.parent.fsName : "";
+    return JSON.stringify({ path: path });
   } catch (e) {
-    return "";
+    return JSON.stringify({ path: "" });
   }
 }

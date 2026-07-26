@@ -10,10 +10,10 @@ const path = require('path');
 
 
 const EXTENSION_ID = 'com.ps.export.layer.tool';
-// 卸载时需要保留的用户文件（相对于 lib/ 目录）
-const LIB_KEEP_FILES = [];
+// 卸载时需要保留的用户文件（相对于 dist/lib/ 目录）
+const LIB_KEEP_FILES = ['presets/default.json'];
 // 卸载时需要保留的用户目录（相对于 dist/lib/ 目录）
-const LIB_KEEP_DIRS = [];
+const LIB_KEEP_DIRS = ['presets'];
 
 // ==================== 工具函数 ====================
 
