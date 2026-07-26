@@ -109,13 +109,16 @@ function main() {
   // 2. 更新 doc/使用文档.md
   const docUpdated = updateDocVersion(currentVersion, newVersion);
 
-  // 3. 执行 npm version（更新 package.json + 创建 commit + 创建 tag）
-  log(`执行 npm version ${newVersion}...`);
-  try {
-    exec(`npm version ${newVersion} --no-git-tag-version`);
-  } catch (e) {
-    console.error('[错误] npm version 失败:', e.message);
-    process.exit(1);
+  // 3. 更新 package.json 版本号（与当前版本相同时跳过）
+  if (newVersion !== currentVersion) {
+    try {
+      exec(`npm version ${newVersion} --no-git-tag-version`);
+    } catch (e) {
+      console.error('[错误] npm version 失败:', e.message);
+      process.exit(1);
+    }
+  } else {
+    log(`版本号未变化 (${newVersion})，跳过 package.json 更新`);
   }
 
   // 4. 构建发布文件
@@ -131,8 +134,17 @@ function main() {
   log('提交修改...');
   try {
     exec('git add -A');
-    exec(`git commit -m "release: v${newVersion}"`);
-    exec(`git tag -a "v${newVersion}" -m "Release v${newVersion}"`);
+    // 允许无变更时跳过 commit（版本号未变时可能出现）
+    try {
+      exec(`git commit -m "release: v${newVersion}"`);
+    } catch (e) {
+      if (e.message && e.message.indexOf('nothing to commit') >= 0) {
+        log('无文件变更，跳过 commit');
+      } else {
+        throw e;
+      }
+    }
+    exec(`git tag -f -a "v${newVersion}" -m "Release v${newVersion}"`);
   } catch (e) {
     console.error('[错误] Git 提交失败:', e.message);
     process.exit(1);
