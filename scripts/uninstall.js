@@ -219,7 +219,9 @@ function main() {
     fs.mkdirSync(backupDirPath, { recursive: true });
     // 保存文件
     for (const { name, data } of userFileBackups) {
-      fs.writeFileSync(path.join(backupDirPath, name), data);
+      const fullPath = path.join(backupDirPath, name);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, data);
     }
     // 保存目录
     for (const [dirName, backup] of Object.entries(userDirBackups)) {

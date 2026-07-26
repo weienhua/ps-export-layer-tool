@@ -477,7 +477,9 @@ function main() {
     for (const name of BACKUP_KEEP_FILES) {
       const backupFile = path.join(backupDirPath, name);
       if (fs.existsSync(backupFile)) {
-        fs.copyFileSync(backupFile, path.join(targetDir, 'dist', 'lib', name));
+        const destPath = path.join(targetDir, 'dist', 'lib', name);
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        fs.copyFileSync(backupFile, destPath);
         restoredFiles.push(name);
       }
     }
