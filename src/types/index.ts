@@ -90,6 +90,7 @@ export interface TextLayerInfo {
   autoLeading: boolean;
   lineHeight: number;
   layerName: string;
+  antiAlias: string;
   effects?: LayerEffects;
 }
 
@@ -118,6 +119,7 @@ export interface BatchExportConfig {
   verticalScale: number;
   autoLeading: boolean;
   lineHeight: number;
+  antiAlias: string;
   effects?: LayerEffects;
 }
 

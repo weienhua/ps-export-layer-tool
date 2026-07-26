@@ -78,6 +78,15 @@ $.HostScript = {
 
 需要 PS 操作时优先查阅 `src/jsx/ps-api/API.md` → 无则查 `psdoc/references/` → 都无才从零编写 ActionManager 代码。
 
+### 宿主脚本关键注意事项
+
+- **Layer.id 是属性不是方法**：`layer.id`（数字），不能写 `layer.id()`
+- **bounds() 必须包含效果**：测量和导出时使用 `layer.bounds()`（含图层效果），禁止使用 `boundsNoEffects()`
+- **工作文档尺寸动态计算**：使用 `calcWorkDocSize(fontSize)` 替代硬编码 2000×2000，公式 `clamp(round(fontSize*6+200), 2000, 10000)`
+- **overflow 检查用 if-else if**：避免 bounds 大于画布时 top/bottom（left/right）检查冲突
+- **测量用 Math.ceil**：`Math.ceil(bounds.width)` 确保画布尺寸不小于实际需要
+- **antiAlias 字段**：`TextLayerInfo` 和 `BatchExportConfig` 均包含 `antiAlias: string`，从原图层读取并应用到导出图层
+
 ## 面板通信约定 (关键)
 
 所有 PS 通信必须经过 `PSBridge`，禁止直接在组件中调用 `CSInterface`。
@@ -116,6 +125,11 @@ $.HostScript = {
 | `EvalScript error`（所有调用均失败） | ps-api 类从 `lib/` 子路径导入导致 webpack 模块冲突，须统一从 `ps-api/src/index.ts` 导入 |
 | JSX 修改不生效 | PS 缓存旧脚本，需重启 PS |
 | 文本图层颜色显示为黑色 | ActionDescriptor 中颜色值存储在浮点数格式（`redFloat`/`greenFloat`/`blueFloat`），若只读取整数格式（`red`/`grain`/`blue`）会导致颜色错误 |
+| 导出素材裁切 | overflow 检查必须使用 `if-else if` 而非两个独立 `if`，否则 bounds 大于画布时 top/bottom 检查冲突导致裁切 |
+| Layer.id 报错 "not callable" | `layer.id` 是**属性**（数字），不是方法，使用 `layer.id` 而非 `layer.id()` |
+| bounds() vs boundsNoEffects() | 必须使用 `bounds()`（包含图层效果范围），`boundsNoEffects()` 仅测量文本内容不含效果 |
+| 手动模式仍执行测量 | 手动模式（`sizeMode==="manual"`）已优化跳过 Phase 2 测量，直接进入导出阶段 |
+| 边距默认值 | 默认边距 `paddingW=10, paddingH=10`，修改后持久化到 localStorage（key: `exportLayerTool.paddingW.v1` / `exportLayerTool.paddingH.v1`） |
 
 ## 更多信息
 

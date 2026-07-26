@@ -165,7 +165,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, inject } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, inject } from "vue";
 import { psBridge } from "../bridge";
 import SectionCollapsible from "./SectionCollapsible.vue";
 import AnchorGrid from "./AnchorGrid.vue";
@@ -184,8 +184,8 @@ const format = ref<ExportFormat>("png");
 const sizeMode = ref<SizeMode>("auto");
 const exportWidth = ref(0);
 const exportHeight = ref(0);
-const paddingW = ref(2);
-const paddingH = ref(3);
+const paddingW = ref(10);
+const paddingH = ref(10);
 const anchor = ref<AnchorType>("middle-center");
 const outputDir = ref("");
 const isExporting = ref(false);
@@ -286,6 +286,7 @@ async function detectSize() {
       verticalScale: fontInfo.value.verticalScale,
       autoLeading: fontInfo.value.autoLeading,
       lineHeight: fontInfo.value.lineHeight,
+      antiAlias: fontInfo.value.antiAlias,
       effects: fontInfo.value.effects,
     };
     var result = await psBridge.measureCharacters(config);
@@ -379,6 +380,7 @@ async function startExport() {
     verticalScale: info.verticalScale,
     autoLeading: info.autoLeading,
     lineHeight: info.lineHeight,
+    antiAlias: info.antiAlias,
     effects: info.effects,
   };
 
@@ -433,8 +435,32 @@ function stopPolling() {
 }
 
 onMounted(async () => {
+  // 从 localStorage 读取边距设置
+  var savedPaddingW = localStorage.getItem("exportLayerTool.paddingW.v1");
+  if (savedPaddingW !== null) {
+    var valW = parseInt(savedPaddingW, 10);
+    if (!isNaN(valW) && valW >= 0) {
+      paddingW.value = valW;
+    }
+  }
+  var savedPaddingH = localStorage.getItem("exportLayerTool.paddingH.v1");
+  if (savedPaddingH !== null) {
+    var valH = parseInt(savedPaddingH, 10);
+    if (!isNaN(valH) && valH >= 0) {
+      paddingH.value = valH;
+    }
+  }
+
   await detectTextLayer();
   startPolling();
+});
+
+// 边距变化自动保存到 localStorage
+watch(paddingW, (val) => {
+  localStorage.setItem("exportLayerTool.paddingW.v1", String(val));
+});
+watch(paddingH, (val) => {
+  localStorage.setItem("exportLayerTool.paddingH.v1", String(val));
 });
 
 onUnmounted(() => {

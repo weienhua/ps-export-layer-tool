@@ -149,6 +149,8 @@ Promise<PSResult<T>>
 
 - **ps-api 优先**：宿主脚本中需要 PS 操作时，优先查阅 `src/jsx/ps-api/API.md` 是否已有封装方法（如 `exportToBMP`、`duplicateToDocument`、`History.saveState` 等），这些方法经过验证可直接使用
 - **ps-api 导入统一入口**：所有 ps-api 类（`Document`、`Layer`、`Text`、`SolidColor` 等）必须从 `src/jsx/ps-api/src/index.ts` 统一导入，**禁止**从 `src/jsx/ps-api/src/lib/` 子路径单独导入。单独导入会导致 webpack 模块路径解析不一致，引发整个 hostscript 运行时 `EvalScript error`。
+- **ps-api Layer.id 是属性不是方法**：`layer.id` 返回数字（属性），不能写 `layer.id()`。`layer.name()`、`layer.bounds()` 等是方法，但 `id`、`index` 是属性。
+- **bounds() 必须包含效果**：测量和导出时使用 `layer.bounds()`（含图层效果范围），禁止使用 `boundsNoEffects()`（仅文本内容）。
   ```typescript
   // ✓ 正确写法
   import { Document, Layer, Text, SolidColor } from "../ps-api/src/index";
@@ -305,10 +307,10 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 选中 PS 文本图层后，一键将每个字符导出为统一画布尺寸的 web 素材（PNG/JPG）。
 
 **核心流程**：
-1. 轮询检测选中图层（有文档 1s 间隔，无文档停止）→ 自动读取字体/字号/颜色/样式
+1. 轮询检测选中图层（有文档 1s 间隔，无文档停止）→ 自动读取字体/字号/颜色/样式/抗锯齿/图层效果
 2. 配置导出字符、文件名前缀、画布尺寸（自动检测 + 边距 或 手动输入）、对齐方式（9 点锚位）
 3. 自动默认路径为 PSD 所在目录下的 `output/` 子文件夹
-4. 点击「开始导出」→ 测量每个字符最大宽高 → 以统一画布逐字符导出
+4. 点击「开始导出」→ 自动模式：测量每个字符最大宽高 → 以统一画布逐字符导出；手动模式：直接以指定尺寸逐字符导出（跳过测量阶段）
 
 **子组件**：
 - **SectionCollapsible**：可折叠卡片，状态持久化到 `localStorage`（key: `exportLayerTool.sectionStates.v1`）。参考 ps-layer-tool 设计
@@ -414,6 +416,12 @@ Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.11" -Name "PlayerDebugMode" -V
 | 宿主类型报错（找不到 `app`） | ps-extendscript-types 未引入 | 确认 `tsconfig.jsx.json` 中 `types: ["ps-extendscript-types"]` |
 | 修改 JSX 后不生效 | PS 缓存旧脚本 | 重启 PS 或重新加载扩展 |
 | 面板白屏 | HTML/JS 加载失败 | 打开 `http://localhost:8088` 检查控制台错误 |
+| 导出素材裁切 | overflow 检查必须使用 `if-else if`（非两个独立 `if`），否则 bounds 大于画布时 top/bottom 检查冲突 | overflow 逻辑已修复 |
+| Layer.id 报错 "not callable" | `layer.id` 是属性（数字），不是方法 | 使用 `layer.id` 而非 `layer.id()` |
+| 超大字号测量失败 | 工作文档硬编码 2000×2000 | 使用 `calcWorkDocSize(fontSize)` 动态计算 |
+| 手动模式导出慢 | 仍执行完整测量流程 | 手动模式跳过 Phase 2，直接进入导出 |
+| 边距太小导致裁切 | 默认 `paddingW=2, paddingH=3` | 默认改为 10/10，且持久化到 localStorage |
+| 抗锯齿不一致 | 导出素材边缘不平滑 | 从原图层读取 antiAlias 并应用 |
 
 ## 会话交接约定
 

@@ -377,6 +377,21 @@ export function getTextLayerInfo(): string {
     var layerName = "";
     try { layerName = layer.name(); } catch (e) { /* 忽略 */ }
 
+    // 读取抗锯齿设置（默认 Smooth）
+    var antiAlias = "antiAliasSmooth";
+    try {
+      var aaRef = new ActionReference();
+      aaRef.putIdentifier(charIDToTypeID("Lyr "), layer.id);
+      var aaDesc = executeActionGet(aaRef);
+      if (aaDesc.hasKey(stringIDToTypeID("textKey"))) {
+        var textKeyDesc = aaDesc.getObjectValue(stringIDToTypeID("textKey"));
+        if (textKeyDesc.hasKey(stringIDToTypeID("antiAlias"))) {
+          var aaEnum = textKeyDesc.getEnumerationValue(stringIDToTypeID("antiAlias"));
+          antiAlias = typeIDToStringID(aaEnum);
+        }
+      }
+    } catch (e) { /* 忽略 */ }
+
     var effects = readLayerEffects(layer);
 
     var info = {
@@ -392,6 +407,7 @@ export function getTextLayerInfo(): string {
       autoLeading: isAutoLeading,
       lineHeight: lineHeight,
       layerName: layerName,
+      antiAlias: antiAlias,
       effects: effects,
     };
 
@@ -442,7 +458,8 @@ export function batchExport(configJson: string): string {
     } catch (e) { /* 忽略 */ }
 
     // ==================== Phase 1: 创建测量文档 ====================
-    var workDoc = Document.create("_batch", 2000, 2000, 72, false, false);
+    var workDocSize = calcWorkDocSize(config.fontSize);
+    var workDoc = Document.create("_batch", workDocSize, workDocSize, 72, false, false);
 
     var measuredChars: Array<{
       character: string;
@@ -454,47 +471,49 @@ export function batchExport(configJson: string): string {
     var maxW = 0;
     var maxH = 0;
 
-    // ==================== Phase 2: 逐字符测量 ====================
-    for (var i = 0; i < characters.length; i++) {
-      var ch = characters.charAt(i);
+    // ==================== Phase 2: 逐字符测量（仅自动模式） ====================
+    if (sizeMode === "auto") {
+      for (var i = 0; i < characters.length; i++) {
+        var ch = characters.charAt(i);
 
-      var text = createTextLayer(ch, config);
-      text.paint();
+        var text = createTextLayer(ch, config);
+        text.paint();
 
-      var layer = Layer.getSelectedLayers()[0];
+        var layer = Layer.getSelectedLayers()[0];
 
-      if (originalLayerEffects !== null) {
-        var fxDesc = new ActionDescriptor();
-        var ref2 = new ActionReference();
-        ref2.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-        fxDesc.putReference(charIDToTypeID("null"), ref2);
-        fxDesc.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
-        executeAction(stringIDToTypeID("set"), fxDesc, DialogModes.NO);
-      }
+        if (originalLayerEffects !== null) {
+          var fxDesc = new ActionDescriptor();
+          var ref2 = new ActionReference();
+          ref2.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+          fxDesc.putReference(charIDToTypeID("null"), ref2);
+          fxDesc.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
+          executeAction(stringIDToTypeID("set"), fxDesc, DialogModes.NO);
+        }
 
-      var bounds = layer.bounds();
-      var charW = Math.round(bounds.width);
-      var charH = Math.round(bounds.height);
+        var bounds = layer.bounds();
+        var charW = Math.ceil(bounds.width);
+        var charH = Math.ceil(bounds.height);
 
-      measuredChars.push({
-        character: ch,
-        x: bounds.x,
-        y: bounds.y,
-        w: charW,
-        h: charH,
-      });
+        measuredChars.push({
+          character: ch,
+          x: bounds.x,
+          y: bounds.y,
+          w: charW,
+          h: charH,
+        });
 
-      if (charW > maxW) {
-        maxW = charW;
-      }
-      if (charH > maxH) {
-        maxH = charH;
-      }
+        if (charW > maxW) {
+          maxW = charW;
+        }
+        if (charH > maxH) {
+          maxH = charH;
+        }
 
-      try {
-        layer.remove();
-      } catch (eRemove) {
-        // 删除失败不阻断流程
+        try {
+          layer.remove();
+        } catch (eRemove) {
+          // 删除失败不阻断流程
+        }
       }
     }
 
@@ -527,80 +546,192 @@ export function batchExport(configJson: string): string {
     // ==================== Phase 4: 逐字符导出 ====================
     var isPng = format === "png";
     var ext = isPng ? ".png" : ".jpg";
+    var exportCount = 0;
 
-    for (var j = 0; j < measuredChars.length; j++) {
-      var measured = measuredChars[j];
-      var ch2 = measured.character;
+    if (sizeMode === "auto") {
+      // 自动模式：遍历测量结果
+      for (var j = 0; j < measuredChars.length; j++) {
+        var measured = measuredChars[j];
+        var ch2 = measured.character;
 
-      // 创建文本图层
-      var exportText = createTextLayer(ch2, config);
-      exportText.paint();
+        // 创建文本图层
+        var exportText = createTextLayer(ch2, config);
+        exportText.paint();
 
-      var exportLayer = Layer.getSelectedLayers()[0];
+        var exportLayer = Layer.getSelectedLayers()[0];
 
-      if (originalLayerEffects !== null) {
-        var fxDesc2 = new ActionDescriptor();
-        var ref3 = new ActionReference();
-        ref3.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-        fxDesc2.putReference(charIDToTypeID("null"), ref3);
-        fxDesc2.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
-        executeAction(stringIDToTypeID("set"), fxDesc2, DialogModes.NO);
+        if (originalLayerEffects !== null) {
+          var fxDesc2 = new ActionDescriptor();
+          var ref3 = new ActionReference();
+          ref3.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+          fxDesc2.putReference(charIDToTypeID("null"), ref3);
+          fxDesc2.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
+          executeAction(stringIDToTypeID("set"), fxDesc2, DialogModes.NO);
+        }
+
+        var exportBounds = exportLayer.bounds();
+
+        // 计算偏移
+        var translateX = calcAnchorOffsetX(
+          anchor,
+          exportBounds.x,
+          exportBounds.width,
+          finalW
+        );
+        var translateY = calcAnchorOffsetY(
+          anchor,
+          exportBounds.y,
+          exportBounds.height,
+          finalH
+        );
+
+        // 检查移动后的边界，避免文本超出画布
+        // 仅当 bounds 不大于画布时才调整，避免 top/bottom 冲突
+        var movedTop = exportBounds.y + translateY;
+        var movedBottom = exportBounds.y + exportBounds.height + translateY;
+        var movedLeft = exportBounds.x + translateX;
+        var movedRight = exportBounds.x + exportBounds.width + translateX;
+
+        if (exportBounds.height <= finalH) {
+          if (movedTop < 0) {
+            translateY -= movedTop;
+          } else if (movedBottom > finalH) {
+            translateY -= (movedBottom - finalH);
+          }
+        }
+        if (exportBounds.width <= finalW) {
+          if (movedLeft < 0) {
+            translateX -= movedLeft;
+          } else if (movedRight > finalW) {
+            translateX -= (movedRight - finalW);
+          }
+        }
+
+        // 平移图层
+        translateLayerBy(translateX, translateY);
+
+        // 导出文件名
+        var safeChar = sanitizeFilenameChar(ch2);
+        var filename = prefix + safeChar + ext;
+
+        // 使用 exportToWeb 导出
+        if (isPng) {
+          // @ts-ignore
+          var pngOptions = new ExportOptionsSaveForWeb();
+          pngOptions.format = SaveDocumentType.PNG;
+          pngOptions.PNG8 = false;
+          pngOptions.transparency = true;
+          workDoc.exportToWeb(outputDir, filename, pngOptions);
+        } else {
+          // @ts-ignore
+          var jpgOptions = new ExportOptionsSaveForWeb();
+          jpgOptions.format = SaveDocumentType.JPEG;
+          jpgOptions.quality = 85;
+          workDoc.exportToWeb(outputDir, filename, jpgOptions);
+        }
+
+        try {
+          exportLayer.remove();
+        } catch (eRemove) {
+          // 删除失败不阻断流程
+        }
+
+        exportCount++;
       }
+    } else {
+      // 手动模式：直接遍历字符，跳过单独测量阶段
+      for (var k = 0; k < characters.length; k++) {
+        var ch3 = characters.charAt(k);
 
-      var exportBounds = exportLayer.bounds();
+        // 创建文本图层
+        var exportText2 = createTextLayer(ch3, config);
+        exportText2.paint();
 
-      // 计算偏移
-      var translateX = calcAnchorOffsetX(
-        anchor,
-        exportBounds.x,
-        exportBounds.width,
-        finalW
-      );
-      var translateY = calcAnchorOffsetY(
-        anchor,
-        exportBounds.y,
-        exportBounds.height,
-        finalH
-      );
+        var exportLayer2 = Layer.getSelectedLayers()[0];
 
-      // 确保文本完全在画布内（处理手动模式下画布尺寸过小的情况）
-      var overflowTop = exportBounds.y + translateY;
-      var overflowBottom = exportBounds.y + exportBounds.height + translateY - finalH;
-      var overflowLeft = exportBounds.x + translateX;
-      var overflowRight = exportBounds.x + exportBounds.width + translateX - finalW;
+        if (originalLayerEffects !== null) {
+          var fxDesc3 = new ActionDescriptor();
+          var ref4 = new ActionReference();
+          ref4.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+          fxDesc3.putReference(charIDToTypeID("null"), ref4);
+          fxDesc3.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
+          executeAction(stringIDToTypeID("set"), fxDesc3, DialogModes.NO);
+        }
 
-      if (overflowTop < 0) translateY -= overflowTop;
-      if (overflowBottom > 0) translateY -= overflowBottom;
-      if (overflowLeft < 0) translateX -= overflowLeft;
-      if (overflowRight > 0) translateX -= overflowRight;
+        var exportBounds2 = exportLayer2.bounds();
+        var charW2 = Math.ceil(exportBounds2.width);
+        var charH2 = Math.ceil(exportBounds2.height);
 
-      // 平移图层
-      translateLayerBy(translateX, translateY);
+        // 顺带统计最大尺寸（用于结果展示）
+        if (charW2 > maxW) maxW = charW2;
+        if (charH2 > maxH) maxH = charH2;
 
-      // 导出文件名
-      var safeChar = sanitizeFilenameChar(ch2);
-      var filename = prefix + safeChar + ext;
+        // 计算偏移
+        var translateX2 = calcAnchorOffsetX(
+          anchor,
+          exportBounds2.x,
+          exportBounds2.width,
+          finalW
+        );
+        var translateY2 = calcAnchorOffsetY(
+          anchor,
+          exportBounds2.y,
+          exportBounds2.height,
+          finalH
+        );
 
-      // 使用 exportToWeb 导出
-      if (isPng) {
-        // @ts-ignore
-        var pngOptions = new ExportOptionsSaveForWeb();
-        pngOptions.format = SaveDocumentType.PNG;
-        pngOptions.PNG8 = false;
-        pngOptions.transparency = true;
-        workDoc.exportToWeb(outputDir, filename, pngOptions);
-      } else {
-        // @ts-ignore
-        var jpgOptions = new ExportOptionsSaveForWeb();
-        jpgOptions.format = SaveDocumentType.JPEG;
-        jpgOptions.quality = 85;
-        workDoc.exportToWeb(outputDir, filename, jpgOptions);
-      }
+        // 检查移动后的边界，避免文本超出画布
+        // 仅当 bounds 不大于画布时才调整，避免 top/bottom 冲突
+        var movedTop2 = exportBounds2.y + translateY2;
+        var movedBottom2 = exportBounds2.y + exportBounds2.height + translateY2;
+        var movedLeft2 = exportBounds2.x + translateX2;
+        var movedRight2 = exportBounds2.x + exportBounds2.width + translateX2;
 
-      try {
-        exportLayer.remove();
-      } catch (eRemove) {
-        // 删除失败不阻断流程
+        if (exportBounds2.height <= finalH) {
+          if (movedTop2 < 0) {
+            translateY2 -= movedTop2;
+          } else if (movedBottom2 > finalH) {
+            translateY2 -= (movedBottom2 - finalH);
+          }
+        }
+        if (exportBounds2.width <= finalW) {
+          if (movedLeft2 < 0) {
+            translateX2 -= movedLeft2;
+          } else if (movedRight2 > finalW) {
+            translateX2 -= (movedRight2 - finalW);
+          }
+        }
+
+        // 平移图层
+        translateLayerBy(translateX2, translateY2);
+
+        // 导出文件名
+        var safeChar2 = sanitizeFilenameChar(ch3);
+        var filename2 = prefix + safeChar2 + ext;
+
+        // 使用 exportToWeb 导出
+        if (isPng) {
+          // @ts-ignore
+          var pngOptions2 = new ExportOptionsSaveForWeb();
+          pngOptions2.format = SaveDocumentType.PNG;
+          pngOptions2.PNG8 = false;
+          pngOptions2.transparency = true;
+          workDoc.exportToWeb(outputDir, filename2, pngOptions2);
+        } else {
+          // @ts-ignore
+          var jpgOptions2 = new ExportOptionsSaveForWeb();
+          jpgOptions2.format = SaveDocumentType.JPEG;
+          jpgOptions2.quality = 85;
+          workDoc.exportToWeb(outputDir, filename2, jpgOptions2);
+        }
+
+        try {
+          exportLayer2.remove();
+        } catch (eRemove) {
+          // 删除失败不阻断流程
+        }
+
+        exportCount++;
       }
     }
 
@@ -608,7 +739,7 @@ export function batchExport(configJson: string): string {
     workDoc.close(false);
 
     var result = {
-      total: measuredChars.length,
+      total: exportCount,
       maxWidth: maxW,
       maxHeight: maxH,
       outputDir: outputDir,
@@ -647,7 +778,20 @@ export function measureCharacters(configJson: string): string {
     var config = JSON.parse(configJson);
     var characters = config.characters;
 
-    var workDoc = Document.create("_measure", 2000, 2000, 72, false, false);
+    // 读取原图层效果，与 batchExport Phase 2 保持一致
+    var originalLayerEffects: any = null;
+    try {
+      var srcLayer = app.activeDocument.activeLayer;
+      var srcRef = new ActionReference();
+      srcRef.putIdentifier(charIDToTypeID("Lyr "), srcLayer.id);
+      var srcDesc = executeActionGet(srcRef);
+      if (srcDesc.hasKey(stringIDToTypeID("layerEffects"))) {
+        originalLayerEffects = srcDesc.getObjectValue(stringIDToTypeID("layerEffects"));
+      }
+    } catch (e) { /* 忽略 */ }
+
+    var workDocSize = calcWorkDocSize(config.fontSize);
+    var workDoc = Document.create("_measure", workDocSize, workDocSize, 72, false, false);
 
     var maxW = 0;
     var maxH = 0;
@@ -659,9 +803,20 @@ export function measureCharacters(configJson: string): string {
       text.paint();
 
       var layer = Layer.getSelectedLayers()[0];
+
+      // 应用原图层效果，确保测量结果包含效果范围
+      if (originalLayerEffects !== null) {
+        var fxDesc = new ActionDescriptor();
+        var ref2 = new ActionReference();
+        ref2.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+        fxDesc.putReference(charIDToTypeID("null"), ref2);
+        fxDesc.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
+        executeAction(stringIDToTypeID("set"), fxDesc, DialogModes.NO);
+      }
+
       var bounds = layer.bounds();
-      var charW = Math.round(bounds.width);
-      var charH = Math.round(bounds.height);
+      var charW = Math.ceil(bounds.width);
+      var charH = Math.ceil(bounds.height);
 
       if (charW > maxW) maxW = charW;
       if (charH > maxH) maxH = charH;
@@ -713,6 +868,13 @@ function createTextLayer(content: string, config: any): Text {
     text.setAutoLeading(true);
   } else {
     text.setLineHeight(config.lineHeight);
+  }
+
+  // 应用抗锯齿设置（从原图层读取，默认 Smooth）
+  if (config.antiAlias) {
+    try {
+      text.setAntiAlias(config.antiAlias);
+    } catch (e) { /* 忽略，使用默认 */ }
   }
 
   return text;
@@ -887,6 +1049,17 @@ function calcAnchorOffsetY(
   } else {
     return canvasHeight - textBottom;
   }
+}
+
+/**
+ * 根据字号动态计算工作文档尺寸
+ * 确保单个字符（含图层效果）能完整放下
+ */
+function calcWorkDocSize(fontSize: number): number {
+  var size = Math.round(fontSize * 6 + 200);
+  if (size < 2000) size = 2000;
+  if (size > 10000) size = 10000;
+  return size;
 }
 
 /**
