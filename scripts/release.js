@@ -138,11 +138,8 @@ function main() {
     try {
       exec(`git commit -m "release: v${newVersion}"`);
     } catch (e) {
-      if (e.message && e.message.indexOf('nothing to commit') >= 0) {
-        log('无文件变更，跳过 commit');
-      } else {
-        throw e;
-      }
+      // nothing to commit 时跳过（git 返回码 1）
+      log('无文件变更，跳过 commit');
     }
     exec(`git tag -f -a "v${newVersion}" -m "Release v${newVersion}"`);
   } catch (e) {
