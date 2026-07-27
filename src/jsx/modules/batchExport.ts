@@ -406,6 +406,7 @@ export function getTextLayerInfo(): string {
       verticalScale: vScale,
       autoLeading: isAutoLeading,
       lineHeight: lineHeight,
+      layerId: layer.id,
       layerName: layerName,
       antiAlias: antiAlias,
       effects: effects,

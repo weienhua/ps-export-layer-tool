@@ -232,10 +232,10 @@ const previewEnabled = ref(getSetting("previewEnabled", true));
 const presetName = ref("");
 const tableRows = ref(getSetting("tableRows", 8));
 const exportResult = ref<{ success: boolean; data?: { total: number; maxWidth: number; maxHeight: number; outputDir: string }; error?: string } | null>(null);
-const lastLayerName = ref("");
+const lastLayerId = ref(-1);
 const isNoDocument = ref(false);
 let detectTimer: ReturnType<typeof setInterval> | null = null;
-const POLL_FAST = 10000;
+const POLL_FAST = 1000;
 const detectedMaxW = ref(0);
 const detectedMaxH = ref(0);
 const isMeasuring = ref(false);
@@ -264,17 +264,17 @@ async function detectTextLayer(): Promise<TextLayerInfo | null> {
     var info = result.data;
     isNoDocument.value = false;
     if (!polling) startPolling();
-    if (info.layerName !== lastLayerName.value) {
+    if (info.layerId !== lastLayerId.value) {
       fontInfo.value = info; detectError.value = ""; setDefaultOutputDir();
     }
-    lastLayerName.value = info.layerName;
+    lastLayerId.value = info.layerId;
     return info;
   } else if (result.noDocument) {
     detectError.value = "未打开文档，请在 PS 中打开一个文档并选中文本图层";
-    fontInfo.value = null; lastLayerName.value = ""; isNoDocument.value = true; return null;
+    fontInfo.value = null; lastLayerId.value = -1; isNoDocument.value = true; return null;
   } else {
     isNoDocument.value = false;
-    detectError.value = result.error || "检测失败"; fontInfo.value = null; lastLayerName.value = ""; return null;
+    detectError.value = result.error || "检测失败"; fontInfo.value = null; lastLayerId.value = -1; return null;
   }
 }
 

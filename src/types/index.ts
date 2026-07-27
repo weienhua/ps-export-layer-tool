@@ -111,6 +111,7 @@ export interface TextLayerInfo {
   verticalScale: number;
   autoLeading: boolean;
   lineHeight: number;
+  layerId: number;
   layerName: string;
   antiAlias: string;
   effects?: LayerEffects;
