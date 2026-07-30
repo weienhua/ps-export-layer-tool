@@ -7,8 +7,6 @@
 
 import { Document } from "../ps-api/src/index";
 import { Layer } from "../ps-api/src/index";
-import { Text } from "../ps-api/src/index";
-import { SolidColor } from "../ps-api/src/index";
 import { ensureDirectory } from "./fileOps";
 
 function componentToHex(c: number): string {
@@ -234,6 +232,29 @@ export function getTextLayerInfo(): string {
     var fontScriptName = "";
     try { fontScriptName = text.fontPostScriptName(); } catch (e) { /* 忽略 */ }
 
+    // 检测字体是否已安装
+    var fontAvailable = true;
+    try {
+      var faRef = new ActionReference();
+      faRef.putIdentifier(charIDToTypeID("Lyr "), layer.id);
+      var faDesc = executeActionGet(faRef);
+      if (faDesc.hasKey(stringIDToTypeID("textKey"))) {
+        var faTextKey = faDesc.getObjectValue(stringIDToTypeID("textKey"));
+        if (faTextKey.hasKey(stringIDToTypeID("textStyleRange"))) {
+          var faRangeList = faTextKey.getList(stringIDToTypeID("textStyleRange"));
+          if (faRangeList.count > 0) {
+            var faRangeObj = faRangeList.getObjectValue(0);
+            if (faRangeObj.hasKey(stringIDToTypeID("textStyle"))) {
+              var faStyle = faRangeObj.getObjectValue(stringIDToTypeID("textStyle"));
+              if (faStyle.hasKey(stringIDToTypeID("fontAvailable"))) {
+                fontAvailable = faStyle.getBoolean(stringIDToTypeID("fontAvailable"));
+              }
+            }
+          }
+        }
+      }
+    } catch (e) { /* 忽略 */ }
+
     var fontSize = 12;
     try { fontSize = Math.round(text.size() * 100) / 100; } catch (e) { /* 忽略 */ }
 
@@ -309,6 +330,7 @@ export function getTextLayerInfo(): string {
       lineHeight: lineHeight,
       layerId: layer.id,
       layerName: layerName,
+      fontAvailable: fontAvailable,
       antiAlias: antiAlias,
       opacity: layerOpacity,
       activeEffects: activeEffects,
@@ -349,26 +371,20 @@ export function batchExport(configJson: string): string {
       return dirResult;
     }
 
-    var originalLayerEffects: any = null;
-    try {
-      var srcLayer = app.activeDocument.activeLayer;
-      var srcRef = new ActionReference();
-      srcRef.putIdentifier(charIDToTypeID("Lyr "), srcLayer.id);
-      var srcDesc = executeActionGet(srcRef);
-      // 检查 FX 眼睛是否可见，不可见则跳过全部效果
-      var srcFXVisible = true;
-      try {
-        srcFXVisible = srcDesc.getBoolean(stringIDToTypeID("layerFXVisible"));
-      } catch (e) { /* key 不存在，默认可见 */ }
-      var srcHasEffects = srcDesc.hasKey(stringIDToTypeID("layerEffects"));
-      if (srcHasEffects && srcFXVisible) {
-        originalLayerEffects = srcDesc.getObjectValue(stringIDToTypeID("layerEffects"));
-      }
-    } catch (e) { /* 忽略 */ }
+    // 保存源文档和图层引用（创建 workDoc 后 activeDocument 会变）
+    var srcDoc = app.activeDocument;
+    var srcLayerId = srcDoc.activeLayer.id;
 
-    // ==================== Phase 1: 创建测量文档 ====================
+    // 全局关闭 PS 对话框（字体缺失等不弹窗，自动用默认字体替换）
+    var oldDialogs = app.displayDialogs;
+    app.displayDialogs = DialogModes.NO;
+
+    // ==================== Phase 1: 创建测量文档 + 模板层 ====================
     var workDocSize = calcWorkDocSize(config.fontSize);
     var workDoc = Document.create("_batch", workDocSize, workDocSize, 72, false, false);
+
+    // 跨文档复制源图层到工作文档作为模板
+    var templateLayer = duplicateSourceLayer(srcDoc, srcLayerId, "_batch");
 
     var measuredChars: Array<{
       text: string;
@@ -387,24 +403,9 @@ export function batchExport(configJson: string): string {
         var itemText = items[i].text;
         var itemName = items[i].name || sanitizeFilenameChar(itemText);
 
-        var text = createTextLayer(itemText, config);
-        text.paint();
-
-        var layer = Layer.getSelectedLayers()[0];
-
-        // 应用原图层不透明度
-        if (config.opacity !== undefined && config.opacity !== 255) {
-          setLayerOpacity(layer, config.opacity);
-        }
-
-        if (originalLayerEffects !== null) {
-          var fxDesc = new ActionDescriptor();
-          var ref2 = new ActionReference();
-          ref2.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-          fxDesc.putReference(charIDToTypeID("null"), ref2);
-          fxDesc.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
-          executeAction(stringIDToTypeID("set"), fxDesc, DialogModes.NO);
-        }
+        // 复制模板层 → 改文字（属性/效果/不透明度全保留）
+        var layer = duplicateLayer(templateLayer.id);
+        changeLayerText(itemText);
 
         var bounds = layer.bounds();
         var charW = Math.ceil(bounds.width);
@@ -472,25 +473,9 @@ export function batchExport(configJson: string): string {
         var expTextStr = measured.text;
         var expName = measured.name;
 
-        // 创建文本图层
-        var exportText = createTextLayer(expTextStr, config);
-        exportText.paint();
-
-        var exportLayer = Layer.getSelectedLayers()[0];
-
-        // 应用原图层不透明度
-        if (config.opacity !== undefined && config.opacity !== 255) {
-          setLayerOpacity(exportLayer, config.opacity);
-        }
-
-        if (originalLayerEffects !== null) {
-          var fxDesc2 = new ActionDescriptor();
-          var ref3 = new ActionReference();
-          ref3.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-          fxDesc2.putReference(charIDToTypeID("null"), ref3);
-          fxDesc2.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
-          executeAction(stringIDToTypeID("set"), fxDesc2, DialogModes.NO);
-        }
+        // 复制模板层 → 改文字（属性/效果/不透明度全保留）
+        var exportLayer = duplicateLayer(templateLayer.id);
+        changeLayerText(expTextStr);
 
         var exportBounds = exportLayer.bounds();
 
@@ -566,25 +551,9 @@ export function batchExport(configJson: string): string {
         var itemText2 = items[k].text;
         var itemName2 = items[k].name || sanitizeFilenameChar(itemText2);
 
-        // 创建文本图层
-        var exportText2 = createTextLayer(itemText2, config);
-        exportText2.paint();
-
-        var exportLayer2 = Layer.getSelectedLayers()[0];
-
-        // 应用原图层不透明度
-        if (config.opacity !== undefined && config.opacity !== 255) {
-          setLayerOpacity(exportLayer2, config.opacity);
-        }
-
-        if (originalLayerEffects !== null) {
-          var fxDesc3 = new ActionDescriptor();
-          var ref4 = new ActionReference();
-          ref4.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-          fxDesc3.putReference(charIDToTypeID("null"), ref4);
-          fxDesc3.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
-          executeAction(stringIDToTypeID("set"), fxDesc3, DialogModes.NO);
-        }
+        // 复制模板层 → 改文字（属性/效果/不透明度全保留）
+        var exportLayer2 = duplicateLayer(templateLayer.id);
+        changeLayerText(itemText2);
 
         var exportBounds2 = exportLayer2.bounds();
         var charW2 = Math.ceil(exportBounds2.width);
@@ -672,8 +641,11 @@ export function batchExport(configJson: string): string {
       outputDir: outputDir,
     };
 
+    app.displayDialogs = oldDialogs;
     return JSON.stringify(result);
   } catch (e) {
+    // 恢复对话框设置
+    try { app.displayDialogs = oldDialogs; } catch (e2) { /* 忽略 */ }
     // 清理：确保工作文档被关闭，避免残留 _batch 文档
     try {
       var openDocs = app.documents;
@@ -705,26 +677,19 @@ export function measureCharacters(configJson: string): string {
     var config = JSON.parse(configJson);
     var items = config.items;
 
-    // 读取原图层效果，与 batchExport Phase 2 保持一致
-    var originalLayerEffects: any = null;
-    try {
-      var srcLayer = app.activeDocument.activeLayer;
-      var srcRef = new ActionReference();
-      srcRef.putIdentifier(charIDToTypeID("Lyr "), srcLayer.id);
-      var srcDesc = executeActionGet(srcRef);
-      // 检查 FX 眼睛是否可见，不可见则跳过全部效果
-      var srcFXVisible = true;
-      try {
-        srcFXVisible = srcDesc.getBoolean(stringIDToTypeID("layerFXVisible"));
-      } catch (e) { /* key 不存在，默认可见 */ }
-      var srcHasEffects = srcDesc.hasKey(stringIDToTypeID("layerEffects"));
-      if (srcHasEffects && srcFXVisible) {
-        originalLayerEffects = srcDesc.getObjectValue(stringIDToTypeID("layerEffects"));
-      }
-    } catch (e) { /* 忽略 */ }
+    // 保存源文档和图层引用
+    var srcDoc = app.activeDocument;
+    var srcLayerId = srcDoc.activeLayer.id;
+
+    // 全局关闭 PS 对话框
+    var oldDialogs = app.displayDialogs;
+    app.displayDialogs = DialogModes.NO;
 
     var workDocSize = calcWorkDocSize(config.fontSize);
     var workDoc = Document.create("_measure", workDocSize, workDocSize, 72, false, false);
+
+    // 跨文档复制源图层到工作文档作为模板
+    var templateLayer = duplicateSourceLayer(srcDoc, srcLayerId, "_measure");
 
     var maxW = 0;
     var maxH = 0;
@@ -732,25 +697,9 @@ export function measureCharacters(configJson: string): string {
     for (var i = 0; i < items.length; i++) {
       var ch = items[i].text;
 
-      var text = createTextLayer(ch, config);
-      text.paint();
-
-      var layer = Layer.getSelectedLayers()[0];
-
-      // 应用原图层不透明度
-      if (config.opacity !== undefined && config.opacity !== 255) {
-        setLayerOpacity(layer, config.opacity);
-      }
-
-      // 应用原图层效果，确保测量结果包含效果范围
-      if (originalLayerEffects !== null) {
-        var fxDesc = new ActionDescriptor();
-        var ref2 = new ActionReference();
-        ref2.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-        fxDesc.putReference(charIDToTypeID("null"), ref2);
-        fxDesc.putObject(stringIDToTypeID("to"), stringIDToTypeID("layerEffects"), originalLayerEffects);
-        executeAction(stringIDToTypeID("set"), fxDesc, DialogModes.NO);
-      }
+      // 复制模板层 → 改文字（属性/效果/不透明度全保留）
+      var layer = duplicateLayer(templateLayer.id);
+      changeLayerText(ch);
 
       var bounds = layer.bounds();
       var charW = Math.ceil(bounds.width);
@@ -764,58 +713,87 @@ export function measureCharacters(configJson: string): string {
 
     workDoc.close(false);
 
+    app.displayDialogs = oldDialogs;
     return JSON.stringify({ maxWidth: maxW, maxHeight: maxH });
   } catch (e) {
+    try { app.displayDialogs = oldDialogs; } catch (e2) { /* 忽略 */ }
     return "__ERROR__:" + e;
   }
 }
 
 /**
- * 创建配置了字体属性的 Text 对象
+ * 跨文档复制源图层到目标文档，返回复制后的图层
  */
-function createTextLayer(content: string, config: any): Text {
-  var text = new Text(content);
+function duplicateSourceLayer(
+  srcDoc: any,
+  srcLayerId: number,
+  targetDocName: string
+): any {
+  // 切换到源文档
+  app.activeDocument = srcDoc;
 
-  var fontConfig = {
-    name: config.fontName,
-    style: config.fontStyle,
-    scriptName: config.fontScriptName,
-  };
-  text.setFont(fontConfig);
-  text.setSize(config.fontSize);
+  // 选中源图层
+  var selectDesc = new ActionDescriptor();
+  var selectRef = new ActionReference();
+  selectRef.putIdentifier(charIDToTypeID("Lyr "), srcLayerId);
+  selectDesc.putReference(charIDToTypeID("null"), selectRef);
+  selectDesc.putBoolean(charIDToTypeID("MkVs"), false);
+  executeAction(charIDToTypeID("slct"), selectDesc, DialogModes.NO);
 
-  var color = SolidColor.fromHexString(config.colorHex);
-  if (color !== null) {
-    text.setColor(color);
-  }
+  // 复制到目标文档
+  var dupDesc = new ActionDescriptor();
+  var dupRef = new ActionReference();
+  dupRef.putEnumerated(
+    stringIDToTypeID("layer"),
+    stringIDToTypeID("ordinal"),
+    stringIDToTypeID("targetEnum")
+  );
+  dupDesc.putReference(stringIDToTypeID("null"), dupRef);
+  var dstRef = new ActionReference();
+  dstRef.putName(stringIDToTypeID("document"), targetDocName);
+  dupDesc.putReference(stringIDToTypeID("to"), dstRef);
+  dupDesc.putInteger(stringIDToTypeID("version"), 5);
+  executeAction(stringIDToTypeID("duplicate"), dupDesc, DialogModes.NO);
 
-  if (config.syntheticBold) {
-    text.setBold(true);
-  }
-  if (config.syntheticItalic) {
-    text.setItalic(true);
-  }
+  // 切回目标文档，获取复制后的图层
+  var targetDoc = app.documents.getByName(targetDocName);
+  app.activeDocument = targetDoc;
+  return Layer.getSelectedLayers()[0];
+}
 
-  var hScale = config.horizontalScale;
-  var vScale = config.verticalScale;
-  if (hScale !== 100 || vScale !== 100) {
-    text.setScale(hScale, vScale);
-  }
+/**
+ * 文档内复制图层（按 ID 选中后复制），返回复制后的图层
+ */
+function duplicateLayer(layerId: number): any {
+  // 选中图层
+  var selectDesc = new ActionDescriptor();
+  var selectRef = new ActionReference();
+  selectRef.putIdentifier(charIDToTypeID("Lyr "), layerId);
+  selectDesc.putReference(charIDToTypeID("null"), selectRef);
+  selectDesc.putBoolean(charIDToTypeID("MkVs"), false);
+  executeAction(charIDToTypeID("slct"), selectDesc, DialogModes.NO);
 
-  if (config.autoLeading) {
-    text.setAutoLeading(true);
-  } else {
-    text.setLineHeight(config.lineHeight);
-  }
+  // 原地复制
+  var dupDesc = new ActionDescriptor();
+  var dupRef = new ActionReference();
+  dupRef.putEnumerated(
+    stringIDToTypeID("layer"),
+    stringIDToTypeID("ordinal"),
+    stringIDToTypeID("targetEnum")
+  );
+  dupDesc.putReference(stringIDToTypeID("null"), dupRef);
+  dupDesc.putInteger(stringIDToTypeID("version"), 5);
+  executeAction(stringIDToTypeID("duplicate"), dupDesc, DialogModes.NO);
 
-  // 应用抗锯齿设置（从原图层读取，默认 Smooth）
-  if (config.antiAlias) {
-    try {
-      text.setAntiAlias(config.antiAlias);
-    } catch (e) { /* 忽略，使用默认 */ }
-  }
+  return Layer.getSelectedLayers()[0];
+}
 
-  return text;
+/**
+ * 修改当前选中图层的文本内容
+ */
+function changeLayerText(content: string): void {
+  var layer = app.activeDocument.activeLayer as any;
+  layer.textItem.contents = content;
 }
 
 /**
@@ -937,20 +915,3 @@ function sanitizeFilenameChar(ch: string): string {
   return ch;
 }
 
-/**
- * 设置图层不透明度（0-255 → percentUnit 0-100）
- * 参照 ps-api Layer.setFillOpacity() 的 ActionManager 模式
- */
-function setLayerOpacity(layer: any, opacity: number): void {
-  try {
-    var percentValue = Math.round(opacity * 100 / 255);
-    var desc1 = new ActionDescriptor();
-    var ref1 = new ActionReference();
-    ref1.putEnumerated(stringIDToTypeID("layer"), stringIDToTypeID("ordinal"), stringIDToTypeID("targetEnum"));
-    desc1.putReference(stringIDToTypeID("null"), ref1);
-    var desc2 = new ActionDescriptor();
-    desc2.putUnitDouble(stringIDToTypeID("opacity"), stringIDToTypeID("percentUnit"), percentValue);
-    desc1.putObject(stringIDToTypeID("to"), stringIDToTypeID("layer"), desc2);
-    executeAction(stringIDToTypeID("set"), desc1, DialogModes.NO);
-  } catch (e) { /* 忽略 */ }
-}

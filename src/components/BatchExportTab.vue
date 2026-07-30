@@ -9,7 +9,10 @@
       <div v-if="fontInfo" class="font-info-display">
         <div class="font-info-row">
           <span class="font-info-label">字体</span>
-          <span class="font-info-value">{{ fontInfo.fontName }} {{ fontInfo.fontStyle }}, {{ fontInfo.fontSize }}px</span>
+          <span class="font-info-value">
+            {{ fontInfo.fontName }} {{ fontInfo.fontStyle }}, {{ fontInfo.fontSize }}px
+            <span v-if="!fontInfo.fontAvailable" class="font-warning">⚠ 字体未安装</span>
+          </span>
         </div>
         <div class="font-info-row">
           <span class="font-info-label">颜色</span>
@@ -203,11 +206,25 @@
         @reorder="handlePresetReorder"
       />
     </SectionCollapsible>
+
+    <!-- 字体未安装确认弹窗 -->
+    <div v-if="fontWarning.visible" class="modal-overlay" @click.self="fontWarning.visible = false">
+      <div class="modal-dialog">
+        <div class="modal-header">字体未安装</div>
+        <div class="modal-body">
+          字体 "{{ fontWarning.label }}" 未安装，导出时将使用系统默认字体替换。是否继续导出？
+        </div>
+        <div class="modal-footer">
+          <button class="btn" @click="fontWarning.visible = false">取消</button>
+          <button class="btn btn-primary" @click="fontWarning.onConfirm">继续导出</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, inject } from "vue";
+import { ref, reactive, computed, onMounted, onUnmounted, watch, inject } from "vue";
 import { psBridge } from "../bridge";
 import SectionCollapsible from "./SectionCollapsible.vue";
 import AnchorGrid from "./AnchorGrid.vue";
@@ -235,6 +252,7 @@ const paddingH = ref(10);
 const anchor = ref<AnchorType>("middle-center");
 const outputDir = ref("");
 const isExporting = ref(false);
+var fontWarning = reactive({ visible: false, label: "", onConfirm: () => {} });
 const autoExportEnabled = ref(getSetting("autoExportEnabled", false));
 const previewEnabled = ref(getSetting("previewEnabled", true));
 const presetName = ref("");
@@ -293,6 +311,16 @@ async function detectTextLayer(): Promise<TextLayerInfo | null> {
 async function detectSize() {
   if (!fontInfo.value) { showToast("请先选中一个文本图层", true); return; }
   if (items.value.length === 0) { showToast("请先选择预设或添加导出项", true); return; }
+  if (!fontInfo.value.fontAvailable) {
+    fontWarning.label = fontInfo.value.fontName + " " + fontInfo.value.fontStyle;
+    fontWarning.onConfirm = () => { fontWarning.visible = false; doDetectSize(); };
+    fontWarning.visible = true;
+    return;
+  }
+  await doDetectSize();
+}
+
+async function doDetectSize() {
   isMeasuring.value = true;
   try {
     var result = await psBridge.measureCharacters(buildConfig(items.value));
@@ -339,11 +367,8 @@ async function selectFolder() {
   else if (result.error) { showToast(result.error, true); }
 }
 
-async function startExport() {
-  if (isExporting.value) return;
+async function doExport(_info: any) {
   isExporting.value = true;
-  var info = await detectTextLayer();
-  if (!info) { isExporting.value = false; showToast(detectError.value || "请先选中文本图层", true); return; }
   if (items.value.length === 0) { isExporting.value = false; showToast("请先选择预设或添加导出项", true); return; }
   if (outputDir.value.trim() === "") { isExporting.value = false; showToast("请选择导出目录", true); return; }
   if (sizeMode.value === "manual" && (exportWidth.value <= 0 || exportHeight.value <= 0)) {
@@ -358,6 +383,19 @@ async function startExport() {
     } else { exportResult.value = { success: false, error: result.error || "导出失败" }; showToast(result.error || "导出失败", true); }
   } catch (e) { exportResult.value = { success: false, error: String(e) }; showToast("导出失败: " + String(e), true); }
   finally { isExporting.value = false; }
+}
+
+async function startExport() {
+  if (isExporting.value) return;
+  var info = await detectTextLayer();
+  if (!info) { showToast(detectError.value || "请先选中文本图层", true); return; }
+  if (!info.fontAvailable) {
+    fontWarning.label = info.fontName + " " + info.fontStyle;
+    fontWarning.onConfirm = () => { fontWarning.visible = false; doExport(info); };
+    fontWarning.visible = true;
+    return;
+  }
+  await doExport(info);
 }
 
 // items 内联编辑
@@ -506,6 +544,7 @@ onUnmounted(function () { stopPolling(); });
 .dir-row { display: flex; align-items: center; }
 .dir-row > * + * { margin-left: 6px; }
 .dir-input { flex: 1; }
+.font-warning { color: #e6a23c; font-size: 11px; margin-left: 6px; }
 .re-detect-btn { margin-left: auto; }
 
 /* 导出项内嵌表格 */
@@ -568,4 +607,12 @@ onUnmounted(function () { stopPolling(); });
 .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .2s; border-radius: 50%; }
 input:checked + .slider { background-color: #0d6efd; }
 input:checked + .slider:before { transform: translateX(14px); }
+
+/* 自定义弹窗 */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-dialog { background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; max-width: 360px; width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+.modal-header { font-size: 14px; font-weight: 600; color: var(--text-main); margin-bottom: 12px; }
+.modal-body { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px; }
+.modal-footer { display: flex; justify-content: flex-end; }
+.modal-footer > * + * { margin-left: 8px; }
 </style>

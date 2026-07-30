@@ -69,6 +69,7 @@ export interface TextLayerInfo {
   lineHeight: number;
   layerId: number;
   layerName: string;
+  fontAvailable: boolean;
   antiAlias: string;
   opacity: number;
   activeEffects: string[];
