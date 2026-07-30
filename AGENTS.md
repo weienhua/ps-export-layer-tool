@@ -89,7 +89,7 @@ $.HostScript = {
 - **工作文档尺寸动态计算**：使用 `calcWorkDocSize(fontSize)` 替代硬编码 2000×2000，公式 `clamp(round(fontSize*6+200), 2000, 10000)`
 - **overflow 检查用 if-else if**：避免 bounds 大于画布时 top/bottom（left/right）检查冲突
 - **测量用 Math.ceil**：`Math.ceil(bounds.width)` 确保画布尺寸不小于实际需要
-- **antiAlias 字段**：`TextLayerInfo` 和 `BatchExportConfig` 均包含 `antiAlias: string`，从原图层读取并应用到导出图层
+- **导出采用复制图层方案**：跨文档复制源图层 → 文档内每字符复制模板 + `textItem.contents` 改文字。所有文本属性、效果、不透明度通过复制自然继承，无需逐项 set
 
 ## 面板通信约定 (关键)
 
@@ -132,6 +132,7 @@ $.HostScript = {
 | 导出素材裁切 | overflow 检查必须使用 `if-else if` 而非两个独立 `if`，否则 bounds 大于画布时 top/bottom 检查冲突导致裁切 |
 | Layer.id 报错 "not callable" | `layer.id` 是**属性**（数字），不是方法，使用 `layer.id` 而非 `layer.id()` |
 | bounds() vs boundsNoEffects() | 必须使用 `bounds()`（包含图层效果范围），`boundsNoEffects()` 仅测量文本内容不含效果 |
+| 字体缺失导出弹窗 | `app.displayDialogs = DialogModes.NO` 压制，PS 自动用默认字体替换 |
 | 手动模式仍执行测量 | 手动模式（`sizeMode==="manual"`）已优化跳过 Phase 2 测量，直接进入导出阶段 |
 | 边距默认值 | 默认边距 `paddingW=10, paddingH=10`，保存在预设中 |
 | 预设文件被覆盖 | `load()` 不再回写 bundle 数据，预设仅来自文件 + localStorage |

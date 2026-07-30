@@ -316,10 +316,11 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 选中 PS 文本图层后，通过预设系统 + 可编辑导出项列表，将每个渲染文本导出为统一画布尺寸的 web 素材（PNG/JPG）。
 
 **核心流程**：
-1. 轮询检测选中图层 → 自动读取字体/字号/颜色/样式/抗锯齿/图层效果
+1. 轮询检测选中图层 → 自动读取字体/字号/颜色/不透明度/效果/字体可用性
 2. 选择预设（22 个内置预设，支持自定义）自动填充导出项列表和配置
 3. 编辑导出项（渲染文本 + 文件后缀）、文件名前缀、画布尺寸、对齐方式
-4. 点击「开始导出」或开启「应用后自动导出」→ 逐项导出
+4. 点击「开始导出」或开启「应用后自动导出」→ 复制源图层为模板 → 逐字符复制模板层 + 改文字 → 导出
+   - 所有文本属性、图层效果、不透明度通过复制自然继承，无需逐项 set
 
 **预设系统**：
 - 预设卡片列表（底部），支持拖拽排序、hover 预览、自动导出开关
@@ -355,7 +356,7 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 | 文件 | 作用域 | 内容 |
 |------|--------|------|
 | `src/types/cep-panel.d.ts` | 面板侧 | `CSInterface` 类、`HostEnvironment`、`CSEvent` |
-| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息）、`BatchExportConfig`（导出配置）、`BatchExportResult`（导出结果） |
+| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息，含 activeEffects/opacity/fontAvailable）、`BatchExportConfig`（导出配置）、`BatchExportResult`（导出结果）、`ExportPreset`、`ExportPresetItem` |
 | `src/jsx/modules/types.d.ts` | 宿主脚本侧 | ActionManager 全局 API（`executeActionGet`、`stringIDToTypeID` 等） |
 | `ps-extendscript-types`（npm） | 宿主脚本侧 | PS ExtendScript DOM（`app`、`Document`、`ArtLayer` 等） |
 
@@ -401,7 +402,8 @@ Get-Item "$env:APPDATA\Adobe\CEP\extensions\com.ps.export.layer.tool" | Select-O
 ```bash
 defaults write com.adobe.CSXS.9 PlayerDebugMode 1    # PS 2019
 defaults write com.adobe.CSXS.10 PlayerDebugMode 1   # PS 2020-2021
-defaults write com.adobe.CSXS.11 PlayerDebugMode 1   # PS 2022+
+defaults write com.adobe.CSXS.11 PlayerDebugMode 1   # PS 2022
+defaults write com.adobe.CSXS.12 PlayerDebugMode 1   # PS 2023+
 ```
 
 **Windows（注册表）**：
@@ -414,9 +416,13 @@ Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.9" -Name "PlayerDebugMode" -Va
 New-Item -Path "HKCU:\Software\Adobe\CSXS.10" -Force
 Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.10" -Name "PlayerDebugMode" -Value "1" -Type DWord
 
-# CEP 11 (PS 2022+)
+# CEP 11 (PS 2022)
 New-Item -Path "HKCU:\Software\Adobe\CSXS.11" -Force
 Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.11" -Name "PlayerDebugMode" -Value "1" -Type DWord
+
+# CEP 12 (PS 2023+)
+New-Item -Path "HKCU:\Software\Adobe\CSXS.12" -Force
+Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.12" -Name "PlayerDebugMode" -Value "1" -Type DWord
 ```
 
 也可使用 `doc/csxs.reg/` 目录中的注册表文件直接导入。
@@ -437,7 +443,7 @@ Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.11" -Name "PlayerDebugMode" -V
 | 超大字号测量失败 | 工作文档硬编码 2000×2000 | 使用 `calcWorkDocSize(fontSize)` 动态计算 |
 | 手动模式导出慢 | 仍执行完整测量流程 | 手动模式跳过 Phase 2，直接进入导出 |
 | 边距太小导致裁切 | 默认 `paddingW=2, paddingH=3` | 默认改为 10/10，保存在预设中 |
-| 抗锯齿不一致 | 导出素材边缘不平滑 | 从原图层读取 antiAlias 并应用 |
+| 字体缺失导出弹窗 | 导出时 PS 弹出字体管理对话框 | `app.displayDialogs = DialogModes.NO` 全局压制，PS 自动用默认字体替换 |
 | 预设文件被覆盖 | `load()` 从 bundle 写入文件 | 不再内置回写，数据仅来自文件 + localStorage |
 
 ## 会话交接约定
