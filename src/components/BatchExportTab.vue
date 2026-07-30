@@ -19,6 +19,14 @@
           </span>
         </div>
         <div class="font-info-row">
+          <span class="font-info-label">不透明度</span>
+          <span class="font-info-value">{{ Math.round(fontInfo.opacity * 100 / 255) }}%</span>
+        </div>
+        <div class="font-info-row" v-if="fontInfo.activeEffects && fontInfo.activeEffects.length > 0">
+          <span class="font-info-label">效果</span>
+          <span class="font-info-value">{{ fontInfo.activeEffects.join("、") }}</span>
+        </div>
+        <div class="font-info-row">
           <span class="font-info-label">图层</span>
           <span class="font-info-value">{{ fontInfo.layerName }}</span>
           <span class="re-detect-btn"><button class="btn btn-sm" @click="detectTextLayer()" :disabled="isExporting">重新检测</button></span>
@@ -264,8 +272,12 @@ async function detectTextLayer(): Promise<TextLayerInfo | null> {
     var info = result.data;
     isNoDocument.value = false;
     if (!polling) startPolling();
+    // 始终更新 fontInfo：opacity/颜色/效果等属性可能在同一图层上发生变化
+    fontInfo.value = info;
+    detectError.value = "";
+    // 仅图层切换时重新设置输出目录
     if (info.layerId !== lastLayerId.value) {
-      fontInfo.value = info; detectError.value = ""; setDefaultOutputDir();
+      setDefaultOutputDir();
     }
     lastLayerId.value = info.layerId;
     return info;
@@ -307,7 +319,7 @@ function buildConfig(theItems: ExportPresetItem[]): BatchExportConfig {
     syntheticItalic: info ? info.syntheticItalic : false,
     horizontalScale: info ? info.horizontalScale : 100, verticalScale: info ? info.verticalScale : 100,
     autoLeading: info ? info.autoLeading : true, lineHeight: info ? info.lineHeight : -1,
-    antiAlias: info ? info.antiAlias : "antiAliasSmooth", effects: info ? info.effects : undefined,
+    antiAlias: info ? info.antiAlias : "antiAliasSmooth", opacity: info ? info.opacity : 255,
   };
 }
 

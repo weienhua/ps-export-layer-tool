@@ -89,192 +89,89 @@ function getTextLayerColorHex(): string {
  * 获取选中文本图层的字体信息
  * @returns JSON 字符串
  */
- function rgbToHex(r: number, g: number, b: number): string {
-  var rh = Math.round(r).toString(16);
-  var gh = Math.round(g).toString(16);
-  var bh = Math.round(b).toString(16);
-  return "#" + (rh.length === 1 ? "0" + rh : rh) + (gh.length === 1 ? "0" + gh : gh) + (bh.length === 1 ? "0" + bh : bh);
+/**
+ * 效果 stringID → 中文名称映射
+ */
+var EFFECT_NAMES: { [key: string]: string } = {};
+EFFECT_NAMES["solidFill"] = "颜色叠加";
+EFFECT_NAMES["gradientFill"] = "渐变叠加";
+EFFECT_NAMES["patternFill"] = "图案叠加";
+EFFECT_NAMES["dropShadow"] = "投影";
+EFFECT_NAMES["innerShadow"] = "内阴影";
+EFFECT_NAMES["outerGlow"] = "外发光";
+EFFECT_NAMES["innerGlow"] = "内发光";
+EFFECT_NAMES["bevelEmboss"] = "斜面浮雕";
+EFFECT_NAMES["chromeFX"] = "光泽";
+EFFECT_NAMES["frameFX"] = "描边";
+
+/**
+ * 检查单个效果 descriptor 是否 enabled
+ */
+function isEffectEnabled(effect: any): boolean {
+  try { return effect.getBoolean(stringIDToTypeID("enabled")); } catch (e) { return false; }
 }
 
-function readLayerEffects(layer: any): any {
+/**
+ * 获取图层启用的效果名称列表（仅名称，不读参数）
+ * 支持普通 key 和 *Multi 数组格式
+ */
+function getEnabledEffects(layer: any): string[] {
   try {
-    var c2t = app.charIDToTypeID;
-    var s2t = app.stringIDToTypeID;
+    var s2t = stringIDToTypeID;
     var ref = new ActionReference();
-    ref.putIdentifier(c2t("Lyr "), layer.id());
-    var desc = app.executeActionGet(ref);
+    ref.putIdentifier(charIDToTypeID("Lyr "), layer.id);
+    var desc = executeActionGet(ref);
 
-    var effects: any = {};
+    // 检查 FX 眼睛是否可见
+    var fxVisible = true;
+    try { fxVisible = desc.getBoolean(s2t("layerFXVisible")); } catch (e) { /* 忽略 */ }
+    var hasEffects = desc.hasKey(s2t("layerEffects"));
+    if (!hasEffects || !fxVisible) {
+      return [];
+    }
 
-    if (desc.hasKey(s2t("layerEffects"))) {
-      var layerEffects = desc.getObjectValue(s2t("layerEffects"));
+    var layerEffects = desc.getObjectValue(s2t("layerEffects"));
+    var result: string[] = [];
 
-      if (layerEffects.hasKey(s2t("gradientFill"))) {
-        var gf = layerEffects.getObjectValue(s2t("gradientFill"));
-        var gfEnabled = false;
-        try { gfEnabled = gf.getBoolean(s2t("enabled")); } catch (e) { /* 忽略 */ }
-        if (gfEnabled) {
-          var opacity = 100;
-          try { opacity = gf.getInteger(s2t("opacity")); } catch (e) { /* 忽略 */ }
-          var mode = "normal";
-          try { mode = gf.getString(s2t("mode")); } catch (e) { /* 忽略 */ }
-          var angle = 0;
-          try { angle = gf.getInteger(s2t("angle")); } catch (e) { /* 忽略 */ }
-          var type = "linear";
-          try { type = gf.getString(s2t("type")); } catch (e) { /* 忽略 */ }
-          var reverse = false;
-          try { reverse = gf.getBoolean(s2t("reverse")); } catch (e) { /* 忽略 */ }
-          var scale = 100;
-          try { scale = gf.getInteger(s2t("scale")); } catch (e) { /* 忽略 */ }
-          var align = true;
-          try { align = gf.getBoolean(s2t("align")); } catch (e) { /* 忽略 */ }
+    // 单值效果：key 直接是效果 descriptor
+    var singleKeys = ["solidFill", "dropShadow", "outerGlow", "innerGlow", "bevelEmboss", "chromeFX"];
 
-          var colors: any[] = [];
-          try {
-            if (gf.hasKey(s2t("gradient"))) {
-              var gradient = gf.getObjectValue(s2t("gradient"));
-              if (gradient.hasKey(s2t("colors"))) {
-                var colorList = gradient.getList(s2t("colors"));
-                for (var i = 0; i < colorList.count; i++) {
-                  var colorStop = colorList.getObjectValue(i);
-                  if (colorStop.hasKey(s2t("colorStop"))) {
-                    var stop = colorStop.getObjectValue(s2t("colorStop"));
-                    var location = 0;
-                    try { location = stop.getInteger(s2t("location")); } catch (e) { /* 忽略 */ }
-                    var midpoint = 50;
-                    try { midpoint = stop.getInteger(s2t("midpoint")); } catch (e) { /* 忽略 */ }
-
-                    var colorHex = "#FFFFFF";
-                    try {
-                      var color = stop.getObjectValue(s2t("color"));
-                      var r = 0, g = 0, b = 0;
-                      if (color.hasKey(s2t("redFloat"))) {
-                        r = color.getDouble(s2t("redFloat")) * 255;
-                        g = color.getDouble(s2t("greenFloat")) * 255;
-                        b = color.getDouble(s2t("blueFloat")) * 255;
-                      } else if (color.hasKey(s2t("red"))) {
-                        r = color.getDouble(s2t("red"));
-                        g = color.getDouble(s2t("grain"));
-                        b = color.getDouble(s2t("blue"));
-                      }
-                      colorHex = rgbToHex(r, g, b);
-                    } catch (e) { /* 忽略 */ }
-
-                    colors.push({
-                      color: colorHex,
-                      location: location,
-                      midpoint: midpoint,
-                    });
-                  }
-                }
-              }
-            }
-          } catch (e) { /* 忽略 */ }
-
-          effects.gradientFill = {
-            enabled: gfEnabled,
-            opacity: opacity,
-            mode: mode,
-            angle: angle,
-            type: type,
-            reverse: reverse,
-            scale: scale,
-            align: align,
-            colors: colors,
-          };
-        }
-      }
-
-      if (layerEffects.hasKey(s2t("dropShadow"))) {
-        var ds = layerEffects.getObjectValue(s2t("dropShadow"));
-        var dsEnabled = false;
-        try { dsEnabled = ds.getBoolean(s2t("enabled")); } catch (e) { /* 忽略 */ }
-        if (dsEnabled) {
-          var dsOpacity = 100;
-          try { dsOpacity = ds.getInteger(s2t("opacity")); } catch (e) { /* 忽略 */ }
-          var dsMode = "multiply";
-          try { dsMode = ds.getString(s2t("mode")); } catch (e) { /* 忽略 */ }
-          var dsColorHex = "#000000";
-          try {
-            var dsColor = ds.getObjectValue(s2t("color"));
-            var dsR = 0, dsG = 0, dsB = 0;
-            if (dsColor.hasKey(s2t("redFloat"))) {
-              dsR = dsColor.getDouble(s2t("redFloat")) * 255;
-              dsG = dsColor.getDouble(s2t("greenFloat")) * 255;
-              dsB = dsColor.getDouble(s2t("blueFloat")) * 255;
-            } else if (dsColor.hasKey(s2t("red"))) {
-              dsR = dsColor.getDouble(s2t("red"));
-              dsG = dsColor.getDouble(s2t("grain"));
-              dsB = dsColor.getDouble(s2t("blue"));
-            }
-            dsColorHex = rgbToHex(dsR, dsG, dsB);
-          } catch (e) { /* 忽略 */ }
-          var dsDistance = 5;
-          try { dsDistance = ds.getInteger(s2t("distance")); } catch (e) { /* 忽略 */ }
-          var dsAngle = 120;
-          try { dsAngle = ds.getInteger(s2t("angle")); } catch (e) { /* 忽略 */ }
-          var dsBlur = 5;
-          try { dsBlur = ds.getInteger(s2t("blur")); } catch (e) { /* 忽略 */ }
-          var dsSpread = 0;
-          try { dsSpread = ds.getInteger(s2t("spread")); } catch (e) { /* 忽略 */ }
-
-          effects.dropShadow = {
-            enabled: dsEnabled,
-            opacity: dsOpacity,
-            mode: dsMode,
-            color: dsColorHex,
-            distance: dsDistance,
-            angle: dsAngle,
-            blur: dsBlur,
-            spread: dsSpread,
-          };
-        }
-      }
-
-      if (layerEffects.hasKey(s2t("stroke"))) {
-        var st = layerEffects.getObjectValue(s2t("stroke"));
-        var stEnabled = false;
-        try { stEnabled = st.getBoolean(s2t("enabled")); } catch (e) { /* 忽略 */ }
-        if (stEnabled) {
-          var stOpacity = 100;
-          try { stOpacity = st.getInteger(s2t("opacity")); } catch (e) { /* 忽略 */ }
-          var stMode = "normal";
-          try { stMode = st.getString(s2t("mode")); } catch (e) { /* 忽略 */ }
-          var stColorHex = "#000000";
-          try {
-            var stColor = st.getObjectValue(s2t("color"));
-            var stR = 0, stG = 0, stB = 0;
-            if (stColor.hasKey(s2t("redFloat"))) {
-              stR = stColor.getDouble(s2t("redFloat")) * 255;
-              stG = stColor.getDouble(s2t("greenFloat")) * 255;
-              stB = stColor.getDouble(s2t("blueFloat")) * 255;
-            } else if (stColor.hasKey(s2t("red"))) {
-              stR = stColor.getDouble(s2t("red"));
-              stG = stColor.getDouble(s2t("grain"));
-              stB = stColor.getDouble(s2t("blue"));
-            }
-            stColorHex = rgbToHex(stR, stG, stB);
-          } catch (e) { /* 忽略 */ }
-          var stSize = 1;
-          try { stSize = st.getInteger(s2t("size")); } catch (e) { /* 忽略 */ }
-          var stPosition = "center";
-          try { stPosition = st.getString(s2t("position")); } catch (e) { /* 忽略 */ }
-
-          effects.stroke = {
-            enabled: stEnabled,
-            opacity: stOpacity,
-            mode: stMode,
-            color: stColorHex,
-            size: stSize,
-            position: stPosition,
-          };
+    for (var i = 0; i < singleKeys.length; i++) {
+      var key = singleKeys[i];
+      if (layerEffects.hasKey(s2t(key))) {
+        var effect = layerEffects.getObjectValue(s2t(key));
+        if (isEffectEnabled(effect)) {
+          result.push(EFFECT_NAMES[key]);
         }
       }
     }
 
-    return effects;
+    // 多值效果（*Multi 数组）：key 是数组，每项是 { "effectKey": {...} }
+    var multiKeys = ["gradientFill", "innerShadow", "frameFX", "patternFill"];
+
+    for (var j = 0; j < multiKeys.length; j++) {
+      var mKey = multiKeys[j];
+      var multiKey = mKey + "Multi";
+      if (layerEffects.hasKey(s2t(multiKey))) {
+        var list = layerEffects.getList(s2t(multiKey));
+        for (var k = 0; k < list.count; k++) {
+          var item = list.getObjectValue(k);
+          if (item.hasKey(s2t(mKey))) {
+            var mEffect = item.getObjectValue(s2t(mKey));
+            if (isEffectEnabled(mEffect)) {
+              var mName = EFFECT_NAMES[mKey];
+              if (result.indexOf(mName) === -1) {
+                result.push(mName);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return result;
   } catch (e) {
-    return {};
+    return [];
   }
 }
 
@@ -338,7 +235,7 @@ export function getTextLayerInfo(): string {
     try { fontScriptName = text.fontPostScriptName(); } catch (e) { /* 忽略 */ }
 
     var fontSize = 12;
-    try { fontSize = text.size(); } catch (e) { /* 忽略 */ }
+    try { fontSize = Math.round(text.size() * 100) / 100; } catch (e) { /* 忽略 */ }
 
     var hasBold = false;
     try { hasBold = text.bold(); } catch (e) { /* 忽略 */ }
@@ -392,7 +289,11 @@ export function getTextLayerInfo(): string {
       }
     } catch (e) { /* 忽略 */ }
 
-    var effects = readLayerEffects(layer);
+    // 读取图层不透明度 (0-255)
+    var layerOpacity = 255;
+    try { layerOpacity = layer.opacity(); } catch (e) { /* 忽略 */ }
+
+    var activeEffects = getEnabledEffects(layer);
 
     var info = {
       fontName: fontName,
@@ -409,7 +310,8 @@ export function getTextLayerInfo(): string {
       layerId: layer.id,
       layerName: layerName,
       antiAlias: antiAlias,
-      effects: effects,
+      opacity: layerOpacity,
+      activeEffects: activeEffects,
     };
 
     return JSON.stringify(info);
@@ -453,7 +355,13 @@ export function batchExport(configJson: string): string {
       var srcRef = new ActionReference();
       srcRef.putIdentifier(charIDToTypeID("Lyr "), srcLayer.id);
       var srcDesc = executeActionGet(srcRef);
-      if (srcDesc.hasKey(stringIDToTypeID("layerEffects"))) {
+      // 检查 FX 眼睛是否可见，不可见则跳过全部效果
+      var srcFXVisible = true;
+      try {
+        srcFXVisible = srcDesc.getBoolean(stringIDToTypeID("layerFXVisible"));
+      } catch (e) { /* key 不存在，默认可见 */ }
+      var srcHasEffects = srcDesc.hasKey(stringIDToTypeID("layerEffects"));
+      if (srcHasEffects && srcFXVisible) {
         originalLayerEffects = srcDesc.getObjectValue(stringIDToTypeID("layerEffects"));
       }
     } catch (e) { /* 忽略 */ }
@@ -483,6 +391,11 @@ export function batchExport(configJson: string): string {
         text.paint();
 
         var layer = Layer.getSelectedLayers()[0];
+
+        // 应用原图层不透明度
+        if (config.opacity !== undefined && config.opacity !== 255) {
+          setLayerOpacity(layer, config.opacity);
+        }
 
         if (originalLayerEffects !== null) {
           var fxDesc = new ActionDescriptor();
@@ -564,6 +477,11 @@ export function batchExport(configJson: string): string {
         exportText.paint();
 
         var exportLayer = Layer.getSelectedLayers()[0];
+
+        // 应用原图层不透明度
+        if (config.opacity !== undefined && config.opacity !== 255) {
+          setLayerOpacity(exportLayer, config.opacity);
+        }
 
         if (originalLayerEffects !== null) {
           var fxDesc2 = new ActionDescriptor();
@@ -653,6 +571,11 @@ export function batchExport(configJson: string): string {
         exportText2.paint();
 
         var exportLayer2 = Layer.getSelectedLayers()[0];
+
+        // 应用原图层不透明度
+        if (config.opacity !== undefined && config.opacity !== 255) {
+          setLayerOpacity(exportLayer2, config.opacity);
+        }
 
         if (originalLayerEffects !== null) {
           var fxDesc3 = new ActionDescriptor();
@@ -789,7 +712,13 @@ export function measureCharacters(configJson: string): string {
       var srcRef = new ActionReference();
       srcRef.putIdentifier(charIDToTypeID("Lyr "), srcLayer.id);
       var srcDesc = executeActionGet(srcRef);
-      if (srcDesc.hasKey(stringIDToTypeID("layerEffects"))) {
+      // 检查 FX 眼睛是否可见，不可见则跳过全部效果
+      var srcFXVisible = true;
+      try {
+        srcFXVisible = srcDesc.getBoolean(stringIDToTypeID("layerFXVisible"));
+      } catch (e) { /* key 不存在，默认可见 */ }
+      var srcHasEffects = srcDesc.hasKey(stringIDToTypeID("layerEffects"));
+      if (srcHasEffects && srcFXVisible) {
         originalLayerEffects = srcDesc.getObjectValue(stringIDToTypeID("layerEffects"));
       }
     } catch (e) { /* 忽略 */ }
@@ -807,6 +736,11 @@ export function measureCharacters(configJson: string): string {
       text.paint();
 
       var layer = Layer.getSelectedLayers()[0];
+
+      // 应用原图层不透明度
+      if (config.opacity !== undefined && config.opacity !== 255) {
+        setLayerOpacity(layer, config.opacity);
+      }
 
       // 应用原图层效果，确保测量结果包含效果范围
       if (originalLayerEffects !== null) {
@@ -882,85 +816,6 @@ function createTextLayer(content: string, config: any): Text {
   }
 
   return text;
-}
-
-function applyGradientFill(gradientFillInfo: any): void {
-  try {
-    var c2t = app.charIDToTypeID;
-    var s2t = app.stringIDToTypeID;
-
-    var desc = new ActionDescriptor();
-    var ref = new ActionReference();
-    ref.putEnumerated(c2t("Lyr "), c2t("Ordn"), c2t("Trgt"));
-    desc.putReference(c2t("null"), ref);
-
-    var gfDesc = new ActionDescriptor();
-    gfDesc.putBoolean(s2t("enabled"), true);
-    gfDesc.putInteger(s2t("opacity"), gradientFillInfo.opacity);
-    gfDesc.putEnumerated(s2t("mode"), s2t("blendMode"), s2t(gradientFillInfo.mode));
-    gfDesc.putInteger(s2t("angle"), gradientFillInfo.angle);
-    gfDesc.putEnumerated(s2t("type"), s2t("gradientType"), s2t(gradientFillInfo.type));
-    gfDesc.putBoolean(s2t("reverse"), gradientFillInfo.reverse);
-    gfDesc.putInteger(s2t("scale"), gradientFillInfo.scale);
-    gfDesc.putBoolean(s2t("align"), gradientFillInfo.align);
-
-    var gradientDesc = new ActionDescriptor();
-    gradientDesc.putString(s2t("name"), "Custom");
-    gradientDesc.putEnumerated(s2t("gradientForm"), s2t("gradientForm"), s2t("customStops"));
-
-    var colorList = new ActionList();
-    for (var i = 0; i < gradientFillInfo.colors.length; i++) {
-      var stop = gradientFillInfo.colors[i];
-      var stopDesc = new ActionDescriptor();
-
-      var colorStopDesc = new ActionDescriptor();
-
-      var colorDesc = new ActionDescriptor();
-      colorDesc.putClass(s2t("class"), s2t("RGBColor"));
-      var hex = stop.color.replace("#", "");
-      var r = parseInt(hex.substring(0, 2), 16);
-      var g = parseInt(hex.substring(2, 4), 16);
-      var b = parseInt(hex.substring(4, 6), 16);
-      colorDesc.putDouble(s2t("red"), r);
-      colorDesc.putDouble(s2t("grain"), g);
-      colorDesc.putDouble(s2t("blue"), b);
-
-      colorStopDesc.putObject(s2t("color"), s2t("RGBColor"), colorDesc);
-      colorStopDesc.putEnumerated(s2t("type"), s2t("colorStopType"), s2t("userStop"));
-      colorStopDesc.putInteger(s2t("location"), stop.location);
-      colorStopDesc.putInteger(s2t("midpoint"), stop.midpoint);
-
-      stopDesc.putObject(s2t("colorStop"), s2t("colorStop"), colorStopDesc);
-      colorList.putObject(s2t("colorStop"), stopDesc);
-    }
-    gradientDesc.putList(s2t("colors"), colorList);
-
-    var transList = new ActionList();
-    var tDesc1 = new ActionDescriptor();
-    var tsDesc1 = new ActionDescriptor();
-    tsDesc1.putInteger(s2t("opacity"), 100);
-    tsDesc1.putInteger(s2t("location"), 0);
-    tsDesc1.putInteger(s2t("midpoint"), 50);
-    tDesc1.putObject(s2t("transferSpec"), s2t("transferSpec"), tsDesc1);
-    transList.putObject(s2t("transferSpec"), tDesc1);
-
-    var tDesc2 = new ActionDescriptor();
-    var tsDesc2 = new ActionDescriptor();
-    tsDesc2.putInteger(s2t("opacity"), 100);
-    tsDesc2.putInteger(s2t("location"), 4096);
-    tsDesc2.putInteger(s2t("midpoint"), 50);
-    tDesc2.putObject(s2t("transferSpec"), s2t("transferSpec"), tsDesc2);
-    transList.putObject(s2t("transferSpec"), tDesc2);
-
-    gradientDesc.putList(s2t("transparency"), transList);
-    gfDesc.putObject(s2t("gradient"), s2t("gradient"), gradientDesc);
-
-    desc.putObject(s2t("using"), s2t("gradientFill"), gfDesc);
-
-    app.executeAction(s2t("make"), desc, DialogModes.NO);
-  } catch (e) {
-    $.writeln("applyGradientFill error: " + e);
-  }
 }
 
 /**
@@ -1080,4 +935,22 @@ function sanitizeFilenameChar(ch: string): string {
   if (ch === ">") return "_";
   if (ch === "|") return "_";
   return ch;
+}
+
+/**
+ * 设置图层不透明度（0-255 → percentUnit 0-100）
+ * 参照 ps-api Layer.setFillOpacity() 的 ActionManager 模式
+ */
+function setLayerOpacity(layer: any, opacity: number): void {
+  try {
+    var percentValue = Math.round(opacity * 100 / 255);
+    var desc1 = new ActionDescriptor();
+    var ref1 = new ActionReference();
+    ref1.putEnumerated(stringIDToTypeID("layer"), stringIDToTypeID("ordinal"), stringIDToTypeID("targetEnum"));
+    desc1.putReference(stringIDToTypeID("null"), ref1);
+    var desc2 = new ActionDescriptor();
+    desc2.putUnitDouble(stringIDToTypeID("opacity"), stringIDToTypeID("percentUnit"), percentValue);
+    desc1.putObject(stringIDToTypeID("to"), stringIDToTypeID("layer"), desc2);
+    executeAction(stringIDToTypeID("set"), desc1, DialogModes.NO);
+  } catch (e) { /* 忽略 */ }
 }

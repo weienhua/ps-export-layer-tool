@@ -55,50 +55,6 @@ export type SizeMode = "auto" | "manual";
 /**
  * 文本图层字体信息（从 PS 读取）
  */
-export interface GradientStop {
-  color: string;
-  location: number;
-  midpoint: number;
-}
-
-export interface FXGradientFillInfo {
-  enabled: boolean;
-  opacity: number;
-  mode: string;
-  angle: number;
-  type: string;
-  reverse: boolean;
-  scale: number;
-  align: boolean;
-  colors: GradientStop[];
-}
-
-export interface FXDropShadowInfo {
-  enabled: boolean;
-  opacity: number;
-  mode: string;
-  color: string;
-  distance: number;
-  angle: number;
-  blur: number;
-  spread: number;
-}
-
-export interface FXStrokeInfo {
-  enabled: boolean;
-  opacity: number;
-  mode: string;
-  color: string;
-  size: number;
-  position: string;
-}
-
-export interface LayerEffects {
-  gradientFill?: FXGradientFillInfo;
-  dropShadow?: FXDropShadowInfo;
-  stroke?: FXStrokeInfo;
-}
-
 export interface TextLayerInfo {
   fontName: string;
   fontStyle: string;
@@ -114,7 +70,8 @@ export interface TextLayerInfo {
   layerId: number;
   layerName: string;
   antiAlias: string;
-  effects?: LayerEffects;
+  opacity: number;
+  activeEffects: string[];
 }
 
 /**
@@ -143,7 +100,8 @@ export interface BatchExportConfig {
   autoLeading: boolean;
   lineHeight: number;
   antiAlias: string;
-  effects?: LayerEffects;
+  opacity: number;
+  activeEffects: string[];
 }
 
 /**
