@@ -73,11 +73,11 @@ export class PSBridge {
       var timeoutId = window.setTimeout(function () {
         if (!resolved) {
           resolved = true;
-          var error = 'Host script timeout (no response within 10s)';
-          logCallback?.('error', { script, error, duration: 10000, timestamp: Date.now() });
+          var error = 'Host script timeout (no response within 20s)';
+          logCallback?.('error', { script, error, duration: 20000, timestamp: Date.now() });
           resolve({ success: false, error: error });
         }
-      }, 10000);
+      }, 20000);
 
       this.csInterface.evalScript(script, function (result: any) {
         if (resolved) return;
