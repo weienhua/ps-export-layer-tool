@@ -385,6 +385,8 @@ export function batchExport(configJson: string): string {
 
     // 跨文档复制源图层到工作文档作为模板
     var templateLayer = duplicateSourceLayer(srcDoc, srcLayerId, "_batch");
+    // 隐藏模板层，防止原始文字残留到导出图中
+    templateLayer.hide();
 
     var measuredChars: Array<{
       text: string;
@@ -690,6 +692,8 @@ export function measureCharacters(configJson: string): string {
 
     // 跨文档复制源图层到工作文档作为模板
     var templateLayer = duplicateSourceLayer(srcDoc, srcLayerId, "_measure");
+    // 隐藏模板层，防止原始文字残留
+    templateLayer.hide();
 
     var maxW = 0;
     var maxH = 0;
@@ -785,7 +789,10 @@ function duplicateLayer(layerId: number): any {
   dupDesc.putInteger(stringIDToTypeID("version"), 5);
   executeAction(stringIDToTypeID("duplicate"), dupDesc, DialogModes.NO);
 
-  return Layer.getSelectedLayers()[0];
+  // 确保复制出的图层是可见的（模板层已被隐藏）
+  var dupLayer = Layer.getSelectedLayers()[0];
+  dupLayer.show();
+  return dupLayer;
 }
 
 /**
