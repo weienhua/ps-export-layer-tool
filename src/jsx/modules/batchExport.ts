@@ -5,8 +5,7 @@
  * 所有 ps-api 类统一从 index.ts 导入，避免多路径引用导致的模块冲突
  */
 
-import { Document } from "../ps-api/src/index";
-import { Layer } from "../ps-api/src/index";
+import { Document, Layer } from "../ps-api/src/index";
 import { ensureDirectory } from "./fileOps";
 import { duplicateSourceLayer, duplicateLayer, resizeCanvasWithAnchor, translateLayerBy, calcAnchorOffsetX, calcAnchorOffsetY, sanitizeFilenameChar } from "./exportUtils";
 
@@ -386,6 +385,9 @@ export function batchExport(configJson: string): string {
 
     // 跨文档复制源图层到工作文档作为模板
     var templateLayer = duplicateSourceLayer(srcDoc, srcLayerId, "_batch");
+    // normalize: 将模板层平移到 workDoc 原点 (0,0)，消除源文档绝对坐标影响
+    var templateBounds = templateLayer.bounds();
+    translateLayerBy(-templateBounds.x, -templateBounds.y);
     // 隐藏模板层，防止原始文字残留到导出图中
     templateLayer.hide();
 
@@ -455,13 +457,13 @@ export function batchExport(configJson: string): string {
     }
 
     // ==================== Phase 3: 缩小画布到目标尺寸 ====================
-    // raw ActionManager: resizeCanvas，ps-api 的版本硬编码了居中
+    // raw ActionManager: resizeCanvas，使用 top-left 锚点保证原点仍在 (0,0)
     resizeCanvasWithAnchor(
       workDoc,
       finalW,
       finalH,
-      charIDToTypeID("Cntr"),
-      charIDToTypeID("Cntr")
+      charIDToTypeID("Left"),
+      charIDToTypeID("Top ")
     );
 
     // ==================== Phase 4: 逐字符导出 ====================
@@ -524,20 +526,14 @@ export function batchExport(configJson: string): string {
         // 导出文件名
         var filename = prefix + expName + ext;
 
-        // 使用 exportToWeb 导出
+        // saveAs 使用 PS 主渲染引擎，避免 Save for Web 的文本裁切 bug
+        var filePath1 = outputDir + "/" + filename;
         if (isPng) {
           // @ts-ignore
-          var pngOptions = new ExportOptionsSaveForWeb();
-          pngOptions.format = SaveDocumentType.PNG;
-          pngOptions.PNG8 = false;
-          pngOptions.transparency = true;
-          workDoc.exportToWeb(outputDir, filename, pngOptions);
+          workDoc.saveAs(filePath1, "PNGFormat", true);
         } else {
           // @ts-ignore
-          var jpgOptions = new ExportOptionsSaveForWeb();
-          jpgOptions.format = SaveDocumentType.JPEG;
-          jpgOptions.quality = 85;
-          workDoc.exportToWeb(outputDir, filename, jpgOptions);
+          workDoc.saveAs(filePath1, "JPEG", true);
         }
 
         try {
@@ -608,20 +604,14 @@ export function batchExport(configJson: string): string {
         // 导出文件名
         var filename2 = prefix + itemName2 + ext;
 
-        // 使用 exportToWeb 导出
+        // saveAs 使用 PS 主渲染引擎，避免 Save for Web 的文本裁切 bug
+        var filePath2 = outputDir + "/" + filename2;
         if (isPng) {
           // @ts-ignore
-          var pngOptions2 = new ExportOptionsSaveForWeb();
-          pngOptions2.format = SaveDocumentType.PNG;
-          pngOptions2.PNG8 = false;
-          pngOptions2.transparency = true;
-          workDoc.exportToWeb(outputDir, filename2, pngOptions2);
+          workDoc.saveAs(filePath2, "PNGFormat", true);
         } else {
           // @ts-ignore
-          var jpgOptions2 = new ExportOptionsSaveForWeb();
-          jpgOptions2.format = SaveDocumentType.JPEG;
-          jpgOptions2.quality = 85;
-          workDoc.exportToWeb(outputDir, filename2, jpgOptions2);
+          workDoc.saveAs(filePath2, "JPEG", true);
         }
 
         try {

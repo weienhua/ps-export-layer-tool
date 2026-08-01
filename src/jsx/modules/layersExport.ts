@@ -5,8 +5,7 @@
  * 所有 ps-api 类统一从 index.ts 导入，避免多路径引用导致的模块冲突
  */
 
-import { Document } from "../ps-api/src/index";
-import { Layer } from "../ps-api/src/index";
+import { Document, Layer } from "../ps-api/src/index";
 import { ensureDirectory } from "./fileOps";
 import {
   duplicateSourceLayer,
@@ -177,7 +176,7 @@ export function batchExportLayers(configJson: string): string {
 
     var config = JSON.parse(configJson);
     var prefix = config.prefix;
-    var startIndex = config.startIndex || 1;
+    var startIndex = config.startIndex != null ? config.startIndex : 0;
     var format = config.format;
     var sizeMode = config.sizeMode;
     var exportWidth = config.exportWidth;
@@ -280,18 +279,21 @@ export function batchExportLayers(configJson: string): string {
 
     for (var k = 0; k < validLayers.length; k++) {
       var dupLayer = duplicateSourceLayer(srcDoc, validLayers[k].layer.id, workDocName);
+      // normalize: 将图层平移到 workDoc 原点 (0,0)，消除源文档绝对坐标影响
+      var dupBounds = dupLayer.bounds();
+      translateLayerBy(-dupBounds.x, -dupBounds.y);
       dupLayer.hide(); // 复制后立即隐藏，需要时再 show
       duplicatedLayers.push(dupLayer);
       layerMetaList.push({ name: validLayers[k].name });
     }
 
-    // ── Phase 2: 缩小画布到目标尺寸 ──
+    // ── Phase 2: 缩小画布到目标尺寸（top-left 锚点，保证原点仍在 (0,0)）──
     resizeCanvasWithAnchor(
       workDoc,
       finalW,
       finalH,
-      charIDToTypeID("Cntr"),
-      charIDToTypeID("Cntr")
+      charIDToTypeID("Left"),
+      charIDToTypeID("Top ")
     );
 
     // ── Phase 3: 逐个导出 ──
@@ -345,20 +347,14 @@ export function batchExportLayers(configJson: string): string {
       var paddedNum = padZero(seqNum, padLen);
       var filename = prefix + paddedNum + ext;
 
-      // 7) 导出
+      // 7) 导出（saveAs 使用 PS 主渲染引擎，避免 Save for Web 的文本裁切 bug）
+      var filePath = outputDir + "/" + filename;
       if (isPng) {
         // @ts-ignore
-        var pngOpts = new ExportOptionsSaveForWeb();
-        pngOpts.format = SaveDocumentType.PNG;
-        pngOpts.PNG8 = false;
-        pngOpts.transparency = true;
-        workDoc.exportToWeb(outputDir, filename, pngOpts);
+        workDoc.saveAs(filePath, "PNGFormat", true);
       } else {
         // @ts-ignore
-        var jpgOpts = new ExportOptionsSaveForWeb();
-        jpgOpts.format = SaveDocumentType.JPEG;
-        jpgOpts.quality = 85;
-        workDoc.exportToWeb(outputDir, filename, jpgOpts);
+        workDoc.saveAs(filePath, "JPEG", true);
       }
 
       // 8) 隐藏当前图层

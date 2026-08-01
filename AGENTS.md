@@ -30,7 +30,7 @@ npm run package            # 生产模式构建 + 打包发布文件（zip + 安
   - 共享类型: `src/types/index.ts`（AnchorType, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig(items代替characters), BatchExportResult, ExportPreset, ExportPresetItem）
 - 宿主侧: `src/jsx/hostscript.ts` + `src/jsx/modules/` → webpack(ts-loader, target: ES3) → `dist/jsx/hostscript.js`
   - 入口: `src/jsx/hostscript.ts`（import + $.HostScript 注册）
-  - 模块: `src/jsx/modules/`（utils、document、fileOps、batchExport）
+  - 模块: `src/jsx/modules/`（utils、document、fileOps、batchExport、layersExport、exportUtils）
   - 共享类型: `src/jsx/modules/types.d.ts`（ActionManager API 声明）
 - 宿主工具库: `src/jsx/ps-api/`（photoshop-script-api，vendored），所有类须从 `src/jsx/ps-api/src/index.ts` 统一导入，禁止从 `lib/` 子路径单独导入（会导致 webpack 模块冲突）
 - 类型: `src/types/cep-panel.d.ts`（面板）/ `ps-extendscript-types`（宿主）
@@ -87,6 +87,8 @@ $.HostScript = {
 - **Layer.id 是属性不是方法**：`layer.id`（数字），不能写 `layer.id()`
 - **bounds() 必须包含效果**：测量和导出时使用 `layer.bounds()`（含图层效果），禁止使用 `boundsNoEffects()`
 - **工作文档尺寸动态计算**：使用 `calcWorkDocSize(fontSize)` 替代硬编码 2000×2000，公式 `clamp(round(fontSize*6+200), 2000, 10000)`
+- **导出禁止使用 exportToWeb**：Save for Web 引擎存在文本渲染 bug，导出 PNG/JPG 须用 `workDoc.saveAs(filePath, "PNGFormat"/"JPEG", true)`（PS 主渲染引擎）
+- **duplicate 后须 normalize 到 (0,0)**：跨文档复制后图层保留源文档绝对坐标，须 `translateLayerBy(-bounds.x, -bounds.y)` 归一化，resize 用 top-left 锚点（`Left`/`Top `）避免坐标系偏移
 - **overflow 检查用 if-else if**：避免 bounds 大于画布时 top/bottom（left/right）检查冲突
 - **测量用 Math.ceil**：`Math.ceil(bounds.width)` 确保画布尺寸不小于实际需要
 - **导出采用复制图层方案**：跨文档复制源图层 → 文档内每字符复制模板 + `textItem.contents` 改文字。所有文本属性、效果、不透明度通过复制自然继承，无需逐项 set
@@ -129,7 +131,7 @@ $.HostScript = {
 | `EvalScript error`（所有调用均失败） | ps-api 类从 `lib/` 子路径导入导致 webpack 模块冲突，须统一从 `ps-api/src/index.ts` 导入 |
 | JSX 修改不生效 | PS 缓存旧脚本，需重启 PS |
 | 文本图层颜色显示为黑色 | ActionDescriptor 中颜色值存储在浮点数格式（`redFloat`/`greenFloat`/`blueFloat`），若只读取整数格式（`red`/`grain`/`blue`）会导致颜色错误 |
-| 导出素材裁切 | overflow 检查必须使用 `if-else if` 而非两个独立 `if`，否则 bounds 大于画布时 top/bottom 检查冲突导致裁切 |
+| 导出素材裁切 | 1) 禁用 `exportToWeb`（Save for Web 引擎有文本渲染 bug），用 `saveAs`；2) duplicate 后须 normalize 图层到 (0,0) + resize 用 top-left 锚点 |
 | Layer.id 报错 "not callable" | `layer.id` 是**属性**（数字），不是方法，使用 `layer.id` 而非 `layer.id()` |
 | bounds() vs boundsNoEffects() | 必须使用 `bounds()`（包含图层效果范围），`boundsNoEffects()` 仅测量文本内容不含效果 |
 | 字体缺失导出弹窗 | `app.displayDialogs = DialogModes.NO` 压制，PS 自动用默认字体替换 |

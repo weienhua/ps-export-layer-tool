@@ -164,6 +164,20 @@ Promise<PSResult<T>>
   import { Document } from "../ps-api/src/lib/Document";
   import { Layer } from "../ps-api/src/lib/Layer";
   ```
+- **导出禁止使用 exportToWeb**：PS 的 Save for Web 引擎（`exportToWeb` / `exportDocument` + `ExportType.SAVEFORWEB`）存在文本渲染 bug——文本图层边缘的像素会被裁切 1-2px，即使画布有足够透明边距也会发生。**导出 PNG/JPG 必须使用 `Document.saveAs()`（ps-api 已封装，走 PS 主渲染引擎）**，不能使用 `ExportOptionsSaveForWeb`。
+  ```typescript
+  // ✓ 正确：saveAs 使用 PS 主渲染引擎，导出结果和画布一致
+  // @ts-ignore
+  workDoc.saveAs(filePath, "PNGFormat", true);
+  // @ts-ignore
+  workDoc.saveAs(filePath, "JPEG", true);
+
+  // ✗ 错误：exportToWeb 使用 Save for Web 引擎，文本边缘会裁切
+  var opts = new ExportOptionsSaveForWeb();
+  opts.format = SaveDocumentType.PNG;
+  opts.PNG8 = false;
+  workDoc.exportToWeb(outputDir, filename, opts);
+  ```
 - 若 ps-api 无对应方法，再查阅 `psdoc/references/` 中的 ActionManager 脚本示例和 API 文档作为参考
 - 仅在两者都无现成方案时才从零编写 ActionManager 代码
 - 所有通过 `$.HostScript` 暴露的函数必须是**全局函数**，返回值只能是**字符串**
@@ -247,7 +261,9 @@ src/jsx/
 │   ├── utils.ts           # 通用工具（log、rgbToHex、roundValue）
 │   ├── document.ts        # 文档/图层基础查询
 │   ├── fileOps.ts         # 文件系统操作
-│   └── batchExport.ts     # 批量导出（文本检测 + 字符测量 + 批量导出）
+│   ├── batchExport.ts     # 批量导出（文本检测 + 字符测量 + 批量导出）
+│   ├── layersExport.ts    # 多图层批量导出
+│   └── exportUtils.ts     # 导出通用工具（跨文档复制、画布裁剪、锚点计算）
 └── ps-api/                # photoshop-script-api（vendored）
 ```
 
@@ -265,6 +281,9 @@ src/jsx/
 | `writeFile(path, content)` | fileOps.ts | 写入文件内容 |
 | `ensureDirectory(path)` | fileOps.ts | 确保目录存在 |
 | `getExtensionPath()` | fileOps.ts | 获取扩展目录路径 |
+| `getSelectedLayersInfo()` | layersExport.ts | 读取选中图层的名称/类型/尺寸 |
+| `measureLayers()` | layersExport.ts | 测量选中图层的最大宽高 |
+| `batchExportLayers(configJson)` | layersExport.ts | 多图层批量导出（统一画布尺寸 + 对齐） |
 
 ```typescript
 // 在对应模块文件中定义并导出函数（如 modules/document.ts）
@@ -438,7 +457,7 @@ Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.12" -Name "PlayerDebugMode" -V
 | 宿主类型报错（找不到 `app`） | ps-extendscript-types 未引入 | 确认 `tsconfig.jsx.json` 中 `types: ["ps-extendscript-types"]` |
 | 修改 JSX 后不生效 | PS 缓存旧脚本 | 重启 PS 或重新加载扩展 |
 | 面板白屏 | HTML/JS 加载失败 | 打开 `http://localhost:8088` 检查控制台错误 |
-| 导出素材裁切 | overflow 检查必须使用 `if-else if`（非两个独立 `if`），否则 bounds 大于画布时 top/bottom 检查冲突 | overflow 逻辑已修复 |
+| 导出素材裁切 | 1) 禁止使用 `exportToWeb`（Save for Web 引擎文本渲染 bug），须用 `saveAs`（PS 主渲染引擎）；2) duplicate 后须 normalize 图层到 (0,0) + resize 用 top-left 锚点 | 已全部修复 |
 | Layer.id 报错 "not callable" | `layer.id` 是属性（数字），不是方法 | 使用 `layer.id` 而非 `layer.id()` |
 | 超大字号测量失败 | 工作文档硬编码 2000×2000 | 使用 `calcWorkDocSize(fontSize)` 动态计算 |
 | 手动模式导出慢 | 仍执行完整测量流程 | 手动模式跳过 Phase 2，直接进入导出 |
