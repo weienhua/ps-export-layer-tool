@@ -9,7 +9,7 @@
 const DEBUG = (window as any).DEBUG || false;
 
 // 类型导入
-import type { TextLayerInfo, BatchExportConfig, BatchExportResult } from "./types";
+import type { TextLayerInfo, BatchExportConfig, BatchExportResult, SelectedLayersInfo, BatchExportLayersConfig, BatchExportLayersResult, MeasureLayersResult } from "./types";
 
 /**
  * 通信日志回调类型
@@ -250,6 +250,31 @@ export class PSBridge {
     var configJson = JSON.stringify(config);
     return this.evalScript<BatchExportResult>(
       "$.HostScript.batchExport('" + this.escapeForSingleQuotedString(configJson) + "')"
+    );
+  }
+
+  /**
+   * 获取当前选中的所有图层信息
+   */
+  async getSelectedLayersInfo(): Promise<PSResult<SelectedLayersInfo>> {
+    return this.evalScript<SelectedLayersInfo>("$.HostScript.getSelectedLayersInfo()");
+  }
+
+  /**
+   * 多图层批量测量（仅测量尺寸，不导出）
+   */
+  async measureLayers(): Promise<PSResult<MeasureLayersResult>> {
+    return this.evalScript<MeasureLayersResult>("$.HostScript.measureLayers()");
+  }
+
+  /**
+   * 多图层批量导出
+   * @param config 导出配置
+   */
+  async batchExportLayers(config: BatchExportLayersConfig): Promise<PSResult<BatchExportLayersResult>> {
+    var configJson = JSON.stringify(config);
+    return this.evalScript<BatchExportLayersResult>(
+      "$.HostScript.batchExportLayers('" + this.escapeForSingleQuotedString(configJson) + "')"
     );
   }
 }

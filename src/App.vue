@@ -10,10 +10,8 @@
     <!-- 批量导出 Tab -->
     <BatchExportTab v-if="activeTab === 'batch'" />
 
-    <!-- 图层工具 Tab（占位） -->
-    <div v-else-if="activeTab === 'layers'" class="card">
-      <div class="empty-state">图层工具即将上线</div>
-    </div>
+    <!-- 多图层导出 Tab -->
+    <LayersExportTab v-else-if="activeTab === 'layers'" />
 
     <StatusBar :message="statusMsg" :isError="statusError" />
     <DebugPanel />
@@ -29,6 +27,7 @@ import DebugPanel from "./components/DebugPanel.vue";
 import Toast from "./components/Toast.vue";
 import TabBar from "./components/TabBar.vue";
 import BatchExportTab from "./components/BatchExportTab.vue";
+import LayersExportTab from "./components/LayersExportTab.vue";
 
 // 状态管理
 const statusMsg = ref("就绪");

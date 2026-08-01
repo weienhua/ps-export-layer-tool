@@ -230,7 +230,7 @@ import SectionCollapsible from "./SectionCollapsible.vue";
 import AnchorGrid from "./AnchorGrid.vue";
 import ExportPresetList from "./ExportPresetList.vue";
 import { useExportPreset } from "../composables/useExportPreset";
-import { getSetting, setSetting } from "../composables/settings";
+import { getSetting, setSetting, outputDir } from "../composables/settings";
 import type { AnchorType, ExportFormat, SizeMode, TextLayerInfo, ExportPreset } from "../types";
 import type { BatchExportConfig, ExportPresetItem } from "../types";
 
@@ -250,7 +250,6 @@ const exportHeight = ref(0);
 const paddingW = ref(10);
 const paddingH = ref(10);
 const anchor = ref<AnchorType>("middle-center");
-const outputDir = ref("");
 const isExporting = ref(false);
 var fontWarning = reactive({ visible: false, label: "", onConfirm: () => {} });
 const autoExportEnabled = ref(getSetting("autoExportEnabled", false));

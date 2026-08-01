@@ -114,3 +114,62 @@ export interface BatchExportResult {
   maxHeight: number;
   outputDir: string;
 }
+
+// ── 多图层批量导出类型 ──
+
+/**
+ * 单个选中图层的概要信息
+ */
+export interface LayerInfo {
+  layerId: number;
+  layerName: string;
+  kind: number;
+  kindName: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * 选中图层列表（宿主 → 面板）
+ */
+export interface SelectedLayersInfo {
+  layers: LayerInfo[];
+  totalCount: number;
+}
+
+/**
+ * 多图层批量导出配置（面板 → 宿主）
+ */
+export interface BatchExportLayersConfig {
+  prefix: string;
+  startIndex: number;
+  format: ExportFormat;
+  sizeMode: SizeMode;
+  exportWidth: number;
+  exportHeight: number;
+  paddingW: number;
+  paddingH: number;
+  anchor: AnchorType;
+  outputDir: string;
+  reversed: boolean;
+}
+
+/**
+ * 多图层批量导出结果（宿主 → 面板）
+ */
+export interface BatchExportLayersResult {
+  total: number;
+  maxWidth: number;
+  maxHeight: number;
+  outputDir: string;
+}
+
+/**
+ * 多图层测量结果（宿主 → 面板）
+ */
+export interface MeasureLayersResult {
+  maxWidth: number;
+  maxHeight: number;
+  finalWidth: number;
+  finalHeight: number;
+}

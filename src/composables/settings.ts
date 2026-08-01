@@ -3,6 +3,8 @@
  * 合并: activeTab / tableRows / activePresetId / previewEnabled / autoExportEnabled
  */
 
+import { ref, watch } from "vue";
+
 const KEY = "exportLayerTool.settings.v1";
 
 export function getSetting<T>(key: string, fallback: T): T {
@@ -24,3 +26,12 @@ export function setSetting(key: string, value: any): void {
     localStorage.setItem(KEY, JSON.stringify(obj));
   } catch (e) { /* ignore */ }
 }
+
+/**
+ * 共享的导出目录（跨 tab 同步，localStorage 持久化）
+ */
+export const outputDir = ref<string>(getSetting<string>("outputDir", ""));
+
+watch(outputDir, (val) => {
+  setSetting("outputDir", val);
+}, { immediate: false });
