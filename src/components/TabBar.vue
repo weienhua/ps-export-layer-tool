@@ -25,8 +25,9 @@ defineEmits<{
 }>();
 
 const tabs = [
-  { id: "layers", label: "多图层导出" },
-  { id: "batch", label: "批量导出" },
+  { id: "layers", label: "统一导出" },
+  { id: "batch", label: "文字导出" },
+  { id: "free", label: "自由导出" },
 ];
 </script>
 

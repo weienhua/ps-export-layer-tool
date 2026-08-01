@@ -52,12 +52,15 @@ $.HostScript = {
   getDocumentPath,      // 文档路径（File.fsName）
   getTextLayerInfo,     // 选中文本图层字体/颜色/样式
   measureCharacters,    // 测量字符宽高（items 数组）
-  batchExport,          // 批量导出（items 数组，name fallback 到 sanitize）
+  batchExport,          // 文字批量导出（items 数组，name fallback 到 sanitize）
   selectFolderDialog,   // 文件夹选择对话框
   readFile,             // 读取文件内容
   writeFile,            // 写入文件内容
   ensureDirectory,      // 确保目录存在
   getExtensionPath,     // 获取扩展目录路径
+  getSelectedLayersInfo,// 选中图层信息（名称/类型/尺寸）
+  measureLayers,        // 测量选中图层最大宽高
+  batchExportLayers,    // 统一画布批量导出（多图层）
 };
 ```
 

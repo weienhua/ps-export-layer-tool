@@ -7,11 +7,16 @@
 
     <TabBar v-model="activeTab" />
 
-    <!-- 批量导出 Tab -->
+    <!-- 文字导出 Tab -->
     <BatchExportTab v-if="activeTab === 'batch'" />
 
-    <!-- 多图层导出 Tab -->
+    <!-- 统一导出 Tab -->
     <LayersExportTab v-else-if="activeTab === 'layers'" />
+
+    <!-- 自由导出 Tab（待实现） -->
+    <div v-else-if="activeTab === 'free'" class="placeholder-tab">
+      <p>自由导出 — 保留图层原始尺寸，各自导出</p>
+    </div>
 
     <StatusBar :message="statusMsg" :isError="statusError" />
     <DebugPanel />
@@ -88,5 +93,15 @@ onUnmounted(() => {
   font-weight: 600;
   color: #fff;
   letter-spacing: 0.2px;
+}
+
+.placeholder-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 </style>

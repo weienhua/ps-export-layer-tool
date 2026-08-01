@@ -24,7 +24,7 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   │   ├── Toast.vue          # Toast 提示（provide/inject）
 │   │   ├── DebugPanel.vue     # 调试面板（通信日志）
 │   │   ├── TabBar.vue         # Tab 导航栏
-│   │   ├── BatchExportTab.vue # 批量导出 Tab（预设系统 + items 编辑 + 一键导出）
+│   │   ├── BatchExportTab.vue # 文字导出 Tab（预设系统 + items 编辑 + 一键导出）
 │   │   ├── ExportPresetList.vue # 预设卡片列表（拖拽排序 + hover 预览）
 │   │   ├── SectionCollapsible.vue # 可折叠卡片区域（折叠状态持久化到 localStorage）
 │   │   └── AnchorGrid.vue     # 3×3 锚点网格选择器 + 下拉框
@@ -262,7 +262,7 @@ src/jsx/
 │   ├── document.ts        # 文档/图层基础查询
 │   ├── fileOps.ts         # 文件系统操作
 │   ├── batchExport.ts     # 批量导出（文本检测 + 字符测量 + 批量导出）
-│   ├── layersExport.ts    # 多图层批量导出
+│   ├── layersExport.ts    # 统一画布导出（多图层）
 │   └── exportUtils.ts     # 导出通用工具（跨文档复制、画布裁剪、锚点计算）
 └── ps-api/                # photoshop-script-api（vendored）
 ```
@@ -275,7 +275,7 @@ src/jsx/
 | `getDocumentPath()` | document.ts | 文档文件路径（需用 `.fsName` 取字符串） |
 | `getTextLayerInfo()` | batchExport.ts | 读取选中文本图层的字体/颜色/样式 |
 | `measureCharacters(configJson)` | batchExport.ts | 测量字符宽高，返回 maxWidth/maxHeight |
-| `batchExport(configJson)` | batchExport.ts | 完整批量导出（测量 + 导出） |
+| `batchExport(configJson)` | batchExport.ts | 文字批量导出（测量 + 导出） |
 | `selectFolderDialog()` | fileOps.ts | 原生文件夹选择对话框 |
 | `readFile(path)` | fileOps.ts | 读取文件内容 |
 | `writeFile(path, content)` | fileOps.ts | 写入文件内容 |
@@ -283,7 +283,7 @@ src/jsx/
 | `getExtensionPath()` | fileOps.ts | 获取扩展目录路径 |
 | `getSelectedLayersInfo()` | layersExport.ts | 读取选中图层的名称/类型/尺寸 |
 | `measureLayers()` | layersExport.ts | 测量选中图层的最大宽高 |
-| `batchExportLayers(configJson)` | layersExport.ts | 多图层批量导出（统一画布尺寸 + 对齐） |
+| `batchExportLayers(configJson)` | layersExport.ts | 统一画布批量导出（多图层，固定尺寸 + 对齐） |
 
 ```typescript
 // 在对应模块文件中定义并导出函数（如 modules/document.ts）
@@ -327,10 +327,12 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 
 ### Tab 布局
 
-- **TabBar**：双 tab 导航（「图层工具」「批量导出」），选中状态持久化到 `exportLayerTool.settings.v1`
-- **图层工具** tab：占位（后续扩展）
+- **TabBar**：三 tab 导航（「统一导出」「文字导出」「自由导出」），选中状态持久化到 `exportLayerTool.settings.v1`
+- **统一导出** tab：选中多个图层 → 统一画布尺寸，各自导出（`LayersExportTab`）
+- **文字导出** tab：选中文本图层 → 按字符批量导出（`BatchExportTab`，预设系统）
+- **自由导出** tab：占位（后续实现，不固定画布，图层原始尺寸导出）
 
-### 批量导出 Tab（BatchExportTab）
+### 文字导出 Tab（BatchExportTab）
 
 选中 PS 文本图层后，通过预设系统 + 可编辑导出项列表，将每个渲染文本导出为统一画布尺寸的 web 素材（PNG/JPG）。
 
@@ -351,6 +353,21 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 - **ExportPresetList**：预设卡片列表（拖拽排序 + hover 预览 + 预览开关）
 - **SectionCollapsible**：可折叠卡片，状态持久化到 localStorage
 - **AnchorGrid**：3×3 锚点网格 + 下拉选择器
+
+### 统一导出 Tab（LayersExportTab）
+
+选中多个图层后，每个图层导出为统一画布尺寸的独立图片（PNG/JPG），支持 9 点锚点对齐。
+
+**核心流程**：
+1. 轮询检测选中图层 → 显示图层名称/类型/尺寸列表
+2. 配置画布尺寸（自动检测 + 边距，或手动指定）、对齐方式、序号前缀
+3. 点击「开始导出」→ 创建 workDoc → 逐图层复制并归一化位置 → 锚点对齐 → 导出
+
+**与文字导出 Tab 的区别**：操作对象是图层（非文字内容），不解析文本，不支持预设系统。
+
+### 自由导出 Tab
+
+占位，待实现。计划功能：不固定画布尺寸，每个图层保留原始尺寸独立导出。
 
 ### 其他基础组件
 
