@@ -119,24 +119,31 @@ export function translateLayerBy(offsetX: number, offsetY: number): void {
  * @param boundsX 图层左边界 x 坐标
  * @param textWidth 文本宽度
  * @param canvasWidth 画布宽度
+ * @param padL 左边距（left 锚点时生效），可选
+ * @param padR 右边距（right 锚点时生效），可选
  * @returns 需要平移的 x 偏移量
  */
 export function calcAnchorOffsetX(
   anchor: string,
   boundsX: number,
   textWidth: number,
-  canvasWidth: number
+  canvasWidth: number,
+  padL?: number,
+  padR?: number
 ): number {
   var textLeft = boundsX;
   var textCenter = boundsX + textWidth / 2;
   var textRight = boundsX + textWidth;
+
+  if (padL == null) { padL = 0; }
+  if (padR == null) { padR = 0; }
 
   if (
     anchor === "top-left" ||
     anchor === "middle-left" ||
     anchor === "bottom-left"
   ) {
-    return -textLeft;
+    return -textLeft + padL;
   } else if (
     anchor === "top-center" ||
     anchor === "middle-center" ||
@@ -144,7 +151,7 @@ export function calcAnchorOffsetX(
   ) {
     return canvasWidth / 2 - textCenter;
   } else {
-    return canvasWidth - textRight;
+    return canvasWidth - textRight - padR;
   }
 }
 
@@ -154,24 +161,31 @@ export function calcAnchorOffsetX(
  * @param boundsY 图层上边界 y 坐标
  * @param textHeight 文本高度
  * @param canvasHeight 画布高度
+ * @param padT 上边距（top 锚点时生效），可选
+ * @param padB 下边距（bottom 锚点时生效），可选
  * @returns 需要平移的 y 偏移量
  */
 export function calcAnchorOffsetY(
   anchor: string,
   boundsY: number,
   textHeight: number,
-  canvasHeight: number
+  canvasHeight: number,
+  padT?: number,
+  padB?: number
 ): number {
   var textTop = boundsY;
   var textMiddle = boundsY + textHeight / 2;
   var textBottom = boundsY + textHeight;
+
+  if (padT == null) { padT = 0; }
+  if (padB == null) { padB = 0; }
 
   if (
     anchor === "top-left" ||
     anchor === "top-center" ||
     anchor === "top-right"
   ) {
-    return -textTop;
+    return -textTop + padT;
   } else if (
     anchor === "middle-left" ||
     anchor === "middle-center" ||
@@ -179,7 +193,7 @@ export function calcAnchorOffsetY(
   ) {
     return canvasHeight / 2 - textMiddle;
   } else {
-    return canvasHeight - textBottom;
+    return canvasHeight - textBottom - padB;
   }
 }
 

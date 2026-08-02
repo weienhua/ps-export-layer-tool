@@ -48,7 +48,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-time-digit-symbol",
@@ -123,7 +127,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-time-chinese",
@@ -190,7 +198,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-date-digit-symbol",
@@ -261,7 +273,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-date-chinese",
@@ -328,7 +344,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-week-cn-full",
@@ -367,7 +387,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-week-cn-short",
@@ -406,7 +430,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-week-cn-xingqi",
@@ -445,7 +473,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-week-en-full",
@@ -484,7 +516,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-week-en-full-upper",
@@ -523,7 +559,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-week-en-abbr",
@@ -562,7 +602,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-week-en-abbr-lower",
@@ -601,7 +645,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-week-en-abbr-upper",
@@ -640,7 +688,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-tiangan",
@@ -691,7 +743,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-dizhi",
@@ -750,7 +806,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-shengxiao",
@@ -809,7 +869,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-shichen",
@@ -868,7 +932,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-lunar-month-full",
@@ -927,7 +995,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-lunar-month-single",
@@ -990,7 +1062,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-lunar-day",
@@ -1053,7 +1129,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-cn-upper-num",
@@ -1108,7 +1188,11 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   },
   {
     "id": "builtin-xingzuo",
@@ -1167,6 +1251,10 @@
     "format": "png",
     "anchor": "middle-center",
     "paddingW": 10,
-    "paddingH": 10
+    "paddingH": 10,
+    "paddingTop": 0,
+    "paddingRight": 0,
+    "paddingBottom": 0,
+    "paddingLeft": 0
   }
 ]

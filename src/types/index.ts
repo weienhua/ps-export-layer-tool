@@ -23,6 +23,14 @@ export interface ExportPreset {
   anchor: AnchorType;
   paddingW: number;
   paddingH: number;
+  /** 对齐边距：上（top 锚点时生效） */
+  paddingTop?: number;
+  /** 对齐边距：右（right 锚点时生效） */
+  paddingRight?: number;
+  /** 对齐边距：下（bottom 锚点时生效） */
+  paddingBottom?: number;
+  /** 对齐边距：左（left 锚点时生效） */
+  paddingLeft?: number;
 }
 
 /**
@@ -103,6 +111,14 @@ export interface BatchExportConfig {
   antiAlias: string;
   opacity: number;
   activeEffects: string[];
+  /** 对齐边距：上 */
+  paddingTop?: number;
+  /** 对齐边距：右 */
+  paddingRight?: number;
+  /** 对齐边距：下 */
+  paddingBottom?: number;
+  /** 对齐边距：左 */
+  paddingLeft?: number;
 }
 
 /**
@@ -152,6 +168,14 @@ export interface BatchExportLayersConfig {
   anchor: AnchorType;
   outputDir: string;
   reversed: boolean;
+  /** 对齐边距：上 */
+  paddingTop?: number;
+  /** 对齐边距：右 */
+  paddingRight?: number;
+  /** 对齐边距：下 */
+  paddingBottom?: number;
+  /** 对齐边距：左 */
+  paddingLeft?: number;
 }
 
 /**

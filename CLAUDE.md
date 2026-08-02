@@ -347,13 +347,13 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 **核心流程**：
 1. 轮询检测选中图层 → 自动读取字体/字号/颜色/不透明度/效果/字体可用性
 2. 选择预设（22 个内置预设，支持自定义）自动填充导出项列表和配置
-3. 编辑导出项（渲染文本 + 文件后缀）、文件名前缀、画布尺寸、对齐方式
+3. 编辑导出项（渲染文本 + 文件后缀）、文件名前缀、画布尺寸、对齐方式、对齐边距（四方向）
 4. 点击「开始导出」或开启「应用后自动导出」→ 复制源图层为模板 → 逐字符复制模板层 + 改文字 → 导出
    - 所有文本属性、图层效果、不透明度通过复制自然继承，无需逐项 set
 
 **预设系统**：
 - 预设卡片列表（底部），支持拖拽排序、hover 预览、自动导出开关
-- 预设存储完整配置（items + prefix + format + anchor + paddingW/H）
+- 预设存储完整配置（items + prefix + format + anchor + paddingW/H + paddingTop/Right/Bottom/Left）
 - 数据存储：`dist/lib/presets/default.json` + localStorage `exportLayerTool.presets.v1`
 - 面板设置统一存储：`exportLayerTool.settings.v1`
 
@@ -364,12 +364,17 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 
 ### 统一导出 Tab（LayersExportTab）
 
-选中多个图层后，每个图层导出为统一画布尺寸的独立图片（PNG/JPG），支持 9 点锚点对齐。
+选中多个图层后，每个图层导出为统一画布尺寸的独立图片（PNG/JPG），支持 9 点锚点对齐和四方向对齐边距。
 
 **核心流程**：
 1. 轮询检测选中图层 → 显示图层名称/类型/尺寸列表
-2. 配置画布尺寸（自动检测 + 边距，或手动指定）、对齐方式、序号前缀
-3. 点击「开始导出」→ 创建 workDoc → 逐图层复制并归一化位置 → 锚点对齐 → 导出
+2. 配置画布尺寸（自动检测 + 边距，或手动指定）、对齐方式、对齐边距（四方向）、序号前缀
+3. 点击「开始导出」→ 创建 workDoc → 逐图层复制并归一化位置 → 锚点对齐 + 对齐边距偏移 → 导出
+
+**两层边距**：
+- `paddingW`/`paddingH`：画布扩展边距（`finalW = maxW + paddingW`）
+- `paddingTop/Right/Bottom/Left`：对齐边距（边缘锚点时图层与画布边缘的额外距离）
+- 自动模式画布尺寸 = `maxSize + paddingW/H + padL+R + padT+B`
 
 **与文字导出 Tab 的区别**：操作对象是图层（非文字内容），不解析文本，不支持预设系统。
 

@@ -74,13 +74,13 @@
           <span class="cs-col-label">宽度</span>
           <span class="cs-col-detect">{{ detectedMaxW > 0 ? detectedMaxW : '--' }} px</span>
           <span class="cs-col-pad"><input type="number" v-model="paddingW" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
-          <span class="cs-col-result">{{ detectedMaxW > 0 ? detectedMaxW + paddingW : '--' }} px</span>
+          <span class="cs-col-result">{{ detectedMaxW > 0 ? detectedMaxW + paddingW + alignPadLeft + alignPadRight : '--' }} px</span>
         </div>
         <div class="canvas-size-row">
           <span class="cs-col-label">高度</span>
           <span class="cs-col-detect">{{ detectedMaxH > 0 ? detectedMaxH : '--' }} px</span>
           <span class="cs-col-pad"><input type="number" v-model="paddingH" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
-          <span class="cs-col-result">{{ detectedMaxH > 0 ? detectedMaxH + paddingH : '--' }} px</span>
+          <span class="cs-col-result">{{ detectedMaxH > 0 ? detectedMaxH + paddingH + alignPadTop + alignPadBottom : '--' }} px</span>
         </div>
       </div>
       <div v-else class="canvas-size-table">
@@ -100,6 +100,29 @@
         <button v-if="sizeMode === 'auto'" class="btn btn-sm" @click="detectSize" :disabled="selectedLayers.length === 0 || isMeasuring">
           {{ isMeasuring ? '检测中...' : '检测尺寸' }}
         </button>
+      </div>
+
+      <!-- 对齐边距 -->
+      <div class="canvas-size-table align-pad-table">
+        <div class="canvas-size-row canvas-size-header">
+          <span class="cs-col-label">方向</span><span class="cs-col-pad">对齐边距</span>
+        </div>
+        <div class="canvas-size-row">
+          <span class="cs-col-label">上</span>
+          <span class="cs-col-pad"><input type="number" v-model="alignPadTop" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
+        </div>
+        <div class="canvas-size-row">
+          <span class="cs-col-label">右</span>
+          <span class="cs-col-pad"><input type="number" v-model="alignPadRight" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
+        </div>
+        <div class="canvas-size-row">
+          <span class="cs-col-label">下</span>
+          <span class="cs-col-pad"><input type="number" v-model="alignPadBottom" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
+        </div>
+        <div class="canvas-size-row">
+          <span class="cs-col-label">左</span>
+          <span class="cs-col-pad"><input type="number" v-model="alignPadLeft" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
+        </div>
       </div>
 
       <div class="section-divider"></div>
@@ -173,6 +196,10 @@ const startIndex = ref(0);
 const sizeMode = ref<SizeMode>("auto");
 const paddingW = ref(getSetting("layersPaddingW", 10));
 const paddingH = ref(getSetting("layersPaddingH", 10));
+const alignPadTop = ref(getSetting("layersAlignPadT", 0));
+const alignPadRight = ref(getSetting("layersAlignPadR", 0));
+const alignPadBottom = ref(getSetting("layersAlignPadB", 0));
+const alignPadLeft = ref(getSetting("layersAlignPadL", 0));
 const exportWidth = ref(100);
 const exportHeight = ref(100);
 const anchor = ref<AnchorType>("middle-center");
@@ -210,11 +237,11 @@ const filenamePreview = computed(() => {
 
 // 最终画布尺寸
 const finalCanvasW = computed(() => {
-  if (sizeMode.value === "auto") return detectedMaxW.value > 0 ? detectedMaxW.value + paddingW.value : 0;
+  if (sizeMode.value === "auto") return detectedMaxW.value > 0 ? detectedMaxW.value + paddingW.value + alignPadLeft.value + alignPadRight.value : 0;
   return exportWidth.value;
 });
 const finalCanvasH = computed(() => {
-  if (sizeMode.value === "auto") return detectedMaxH.value > 0 ? detectedMaxH.value + paddingH.value : 0;
+  if (sizeMode.value === "auto") return detectedMaxH.value > 0 ? detectedMaxH.value + paddingH.value + alignPadTop.value + alignPadBottom.value : 0;
   return exportHeight.value;
 });
 
@@ -311,6 +338,10 @@ async function startExport() {
       exportHeight: exportHeight.value,
       paddingW: paddingW.value,
       paddingH: paddingH.value,
+      paddingTop: alignPadTop.value,
+      paddingRight: alignPadRight.value,
+      paddingBottom: alignPadBottom.value,
+      paddingLeft: alignPadLeft.value,
       anchor: anchor.value,
       outputDir: outputDir.value,
       reversed: reversed.value,
@@ -342,6 +373,10 @@ watch(tableRows, (val) => { setSetting("layersTableRows", val); });
 watch(reversed, (val) => { setSetting("layersReversed", val); });
 watch(paddingW, (val) => { setSetting("layersPaddingW", val); });
 watch(paddingH, (val) => { setSetting("layersPaddingH", val); });
+watch(alignPadTop, (val) => { setSetting("layersAlignPadT", val); });
+watch(alignPadRight, (val) => { setSetting("layersAlignPadR", val); });
+watch(alignPadBottom, (val) => { setSetting("layersAlignPadB", val); });
+watch(alignPadLeft, (val) => { setSetting("layersAlignPadL", val); });
 
 onUnmounted(() => {
   stopPolling();
@@ -482,4 +517,6 @@ onUnmounted(() => {
 .result-value { color: var(--text-main); }
 .result-path { word-break: break-all; font-size: 10px; font-family: Consolas, Monaco, monospace; }
 .result-error-msg { color: var(--error); font-size: 11px; }
+
+.align-pad-table { margin-top: 10px; }
 </style>

@@ -183,6 +183,10 @@ export function batchExportLayers(configJson: string): string {
     var exportHeight = config.exportHeight;
     var paddingW = config.paddingW;
     var paddingH = config.paddingH;
+    var padT = config.paddingTop != null ? config.paddingTop : 0;
+    var padR = config.paddingRight != null ? config.paddingRight : 0;
+    var padB = config.paddingBottom != null ? config.paddingBottom : 0;
+    var padL = config.paddingLeft != null ? config.paddingLeft : 0;
     var anchor = config.anchor;
     var outputDir = config.outputDir;
 
@@ -258,15 +262,17 @@ export function batchExportLayers(configJson: string): string {
     var finalW = maxW;
     var finalH = maxH;
     if (sizeMode === "auto") {
-      finalW = maxW + paddingW;
-      finalH = maxH + paddingH;
+      finalW = maxW + paddingW + padL + padR;
+      finalH = maxH + paddingH + padT + padB;
     } else {
       if (exportWidth > 0) finalW = exportWidth;
       if (exportHeight > 0) finalH = exportHeight;
     }
 
-    // ── 估算 workDoc 初始大小 ──
+    // ── 估算 workDoc 初始大小（至少 ≥ 最终画布尺寸）──
     var workDocSize = maxW + maxH + 200;
+    if (workDocSize < finalW) workDocSize = finalW;
+    if (workDocSize < finalH) workDocSize = finalH;
     if (workDocSize < 2000) workDocSize = 2000;
     if (workDocSize > 10000) workDocSize = 10000;
 
@@ -314,28 +320,28 @@ export function batchExportLayers(configJson: string): string {
       // 2) 获取 bounds 用于锚点偏移计算
       var expBounds = expLayer.bounds();
 
-      // 3) 计算偏移
-      var translateX = calcAnchorOffsetX(anchor, expBounds.x, expBounds.width, finalW);
-      var translateY = calcAnchorOffsetY(anchor, expBounds.y, expBounds.height, finalH);
+      // 3) 计算偏移（传入对齐边距）
+      var translateX = calcAnchorOffsetX(anchor, expBounds.x, expBounds.width, finalW, padL, padR);
+      var translateY = calcAnchorOffsetY(anchor, expBounds.y, expBounds.height, finalH, padT, padB);
 
-      // 4) 出界检测与修正
+      // 4) 出界检测与修正（含对齐边距）
       var movedTop = expBounds.y + translateY;
       var movedBottom = expBounds.y + expBounds.height + translateY;
       var movedLeft = expBounds.x + translateX;
       var movedRight = expBounds.x + expBounds.width + translateX;
 
       if (expBounds.height <= finalH) {
-        if (movedTop < 0) {
-          translateY -= movedTop;
-        } else if (movedBottom > finalH) {
-          translateY -= movedBottom - finalH;
+        if (movedTop < padT) {
+          translateY -= movedTop - padT;
+        } else if (movedBottom > finalH - padB) {
+          translateY -= movedBottom - (finalH - padB);
         }
       }
       if (expBounds.width <= finalW) {
-        if (movedLeft < 0) {
-          translateX -= movedLeft;
-        } else if (movedRight > finalW) {
-          translateX -= movedRight - finalW;
+        if (movedLeft < padL) {
+          translateX -= movedLeft - padL;
+        } else if (movedRight > finalW - padR) {
+          translateX -= movedRight - (finalW - padR);
         }
       }
 

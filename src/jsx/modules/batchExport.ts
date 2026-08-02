@@ -362,6 +362,10 @@ export function batchExport(configJson: string): string {
     var exportHeight = config.exportHeight;
     var paddingW = config.paddingW;
     var paddingH = config.paddingH;
+    var padT = config.paddingTop != null ? config.paddingTop : 0;
+    var padR = config.paddingRight != null ? config.paddingRight : 0;
+    var padB = config.paddingBottom != null ? config.paddingBottom : 0;
+    var padL = config.paddingLeft != null ? config.paddingLeft : 0;
     var anchor = config.anchor;
     var outputDir = config.outputDir;
 
@@ -445,8 +449,8 @@ export function batchExport(configJson: string): string {
     var finalH = maxH;
 
     if (sizeMode === "auto") {
-      finalW = maxW + paddingW;
-      finalH = maxH + paddingH;
+      finalW = maxW + paddingW + padL + padR;
+      finalH = maxH + paddingH + padT + padB;
     } else {
       if (exportWidth > 0) {
         finalW = exportWidth;
@@ -484,39 +488,42 @@ export function batchExport(configJson: string): string {
 
         var exportBounds = exportLayer.bounds();
 
-        // 计算偏移
+        // 计算偏移（传入对齐边距）
         var translateX = calcAnchorOffsetX(
           anchor,
           exportBounds.x,
           exportBounds.width,
-          finalW
+          finalW,
+          padL,
+          padR
         );
         var translateY = calcAnchorOffsetY(
           anchor,
           exportBounds.y,
           exportBounds.height,
-          finalH
+          finalH,
+          padT,
+          padB
         );
 
-        // 检查移动后的边界，避免文本超出画布
-        // 仅当 bounds 不大于画布时才调整，避免 top/bottom 冲突
+        // 检查移动后的边界，避免文本超出画布（含对齐边距）
         var movedTop = exportBounds.y + translateY;
         var movedBottom = exportBounds.y + exportBounds.height + translateY;
         var movedLeft = exportBounds.x + translateX;
         var movedRight = exportBounds.x + exportBounds.width + translateX;
 
         if (exportBounds.height <= finalH) {
-          if (movedTop < 0) {
-            translateY -= movedTop;
-          } else if (movedBottom > finalH) {
-            translateY -= (movedBottom - finalH);
+          if (movedTop < padT) {
+            translateY -= movedTop - padT;
+          } else if (movedBottom > finalH - padB) {
+            translateY -= movedBottom - (finalH - padB);
           }
         }
         if (exportBounds.width <= finalW) {
-          if (movedLeft < 0) {
-            translateX -= movedLeft;
-          } else if (movedRight > finalW) {
-            translateX -= (movedRight - finalW);
+          if (movedLeft < padL) {
+            translateX -= movedLeft - padL;
+          } else if (movedRight > finalW - padR) {
+            translateX -= movedRight - (finalW - padR);
           }
         }
 
@@ -562,39 +569,42 @@ export function batchExport(configJson: string): string {
         if (charW2 > maxW) maxW = charW2;
         if (charH2 > maxH) maxH = charH2;
 
-        // 计算偏移
+        // 计算偏移（传入对齐边距）
         var translateX2 = calcAnchorOffsetX(
           anchor,
           exportBounds2.x,
           exportBounds2.width,
-          finalW
+          finalW,
+          padL,
+          padR
         );
         var translateY2 = calcAnchorOffsetY(
           anchor,
           exportBounds2.y,
           exportBounds2.height,
-          finalH
+          finalH,
+          padT,
+          padB
         );
 
-        // 检查移动后的边界，避免文本超出画布
-        // 仅当 bounds 不大于画布时才调整，避免 top/bottom 冲突
+        // 检查移动后的边界，避免文本超出画布（含对齐边距）
         var movedTop2 = exportBounds2.y + translateY2;
         var movedBottom2 = exportBounds2.y + exportBounds2.height + translateY2;
         var movedLeft2 = exportBounds2.x + translateX2;
         var movedRight2 = exportBounds2.x + exportBounds2.width + translateX2;
 
         if (exportBounds2.height <= finalH) {
-          if (movedTop2 < 0) {
-            translateY2 -= movedTop2;
-          } else if (movedBottom2 > finalH) {
-            translateY2 -= (movedBottom2 - finalH);
+          if (movedTop2 < padT) {
+            translateY2 -= movedTop2 - padT;
+          } else if (movedBottom2 > finalH - padB) {
+            translateY2 -= movedBottom2 - (finalH - padB);
           }
         }
         if (exportBounds2.width <= finalW) {
-          if (movedLeft2 < 0) {
-            translateX2 -= movedLeft2;
-          } else if (movedRight2 > finalW) {
-            translateX2 -= (movedRight2 - finalW);
+          if (movedLeft2 < padL) {
+            translateX2 -= movedLeft2 - padL;
+          } else if (movedRight2 > finalW - padR) {
+            translateX2 -= movedRight2 - (finalW - padR);
           }
         }
 

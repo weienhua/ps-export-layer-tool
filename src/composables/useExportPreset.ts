@@ -61,6 +61,10 @@ export function useExportPreset() {
       if (p.anchor === undefined) p.anchor = "middle-center";
       if (p.paddingW === undefined) p.paddingW = 10;
       if (p.paddingH === undefined) p.paddingH = 10;
+      if (p.paddingTop === undefined) p.paddingTop = 0;
+      if (p.paddingRight === undefined) p.paddingRight = 0;
+      if (p.paddingBottom === undefined) p.paddingBottom = 0;
+      if (p.paddingLeft === undefined) p.paddingLeft = 0;
     }
     return data;
   }

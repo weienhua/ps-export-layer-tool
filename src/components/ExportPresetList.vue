@@ -36,6 +36,7 @@
         <div :class="['preset-preview', previewAlign[preset.id] || 'center']">
           <div class="preview-line">前缀: {{ preset.prefix || '(空)' }}</div>
           <div class="preview-line">格式: {{ preset.format === 'jpg' ? 'JPG' : 'PNG' }} | 对齐: {{ anchorLabel(preset.anchor) }} | 边距: {{ preset.paddingW }}×{{ preset.paddingH }}</div>
+          <div class="preview-line" v-if="(preset.paddingTop || preset.paddingRight || preset.paddingBottom || preset.paddingLeft)">对齐边距: 上{{ preset.paddingTop || 0 }} 右{{ preset.paddingRight || 0 }} 下{{ preset.paddingBottom || 0 }} 左{{ preset.paddingLeft || 0 }}</div>
           <div class="preview-line preview-items">{{ preset.items.map(function(i) { return i.text; }).join('  ') }}</div>
         </div>
       </div>

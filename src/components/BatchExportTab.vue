@@ -98,13 +98,13 @@
           <span class="cs-col-label">宽度</span>
           <span class="cs-col-detect">{{ detectedMaxW > 0 ? detectedMaxW : '--' }} px</span>
           <span class="cs-col-pad"><input type="number" v-model="paddingW" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
-          <span class="cs-col-result">{{ detectedMaxW > 0 ? detectedMaxW + paddingW : '--' }} px</span>
+          <span class="cs-col-result">{{ detectedMaxW > 0 ? detectedMaxW + paddingW + alignPadLeft + alignPadRight : '--' }} px</span>
         </div>
         <div class="canvas-size-row">
           <span class="cs-col-label">高度</span>
           <span class="cs-col-detect">{{ detectedMaxH > 0 ? detectedMaxH : '--' }} px</span>
           <span class="cs-col-pad"><input type="number" v-model="paddingH" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
-          <span class="cs-col-result">{{ detectedMaxH > 0 ? detectedMaxH + paddingH : '--' }} px</span>
+          <span class="cs-col-result">{{ detectedMaxH > 0 ? detectedMaxH + paddingH + alignPadTop + alignPadBottom : '--' }} px</span>
         </div>
       </div>
       <div v-else class="canvas-size-table">
@@ -124,6 +124,29 @@
         <button v-if="sizeMode === 'auto'" class="btn btn-sm" @click="detectSize" :disabled="!fontInfo || isMeasuring">
           {{ isMeasuring ? '检测中...' : '检测尺寸' }}
         </button>
+      </div>
+
+      <!-- 对齐边距 -->
+      <div class="canvas-size-table align-pad-table">
+        <div class="canvas-size-row canvas-size-header">
+          <span class="cs-col-label">方向</span><span class="cs-col-pad">对齐边距</span>
+        </div>
+        <div class="canvas-size-row">
+          <span class="cs-col-label">上</span>
+          <span class="cs-col-pad"><input type="number" v-model="alignPadTop" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
+        </div>
+        <div class="canvas-size-row">
+          <span class="cs-col-label">右</span>
+          <span class="cs-col-pad"><input type="number" v-model="alignPadRight" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
+        </div>
+        <div class="canvas-size-row">
+          <span class="cs-col-label">下</span>
+          <span class="cs-col-pad"><input type="number" v-model="alignPadBottom" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
+        </div>
+        <div class="canvas-size-row">
+          <span class="cs-col-label">左</span>
+          <span class="cs-col-pad"><input type="number" v-model="alignPadLeft" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
+        </div>
       </div>
 
       <div class="section-divider"></div>
@@ -169,7 +192,7 @@
         <div v-if="exportResult && exportResult.success" class="result-detail">
           <div class="result-row"><span class="result-label">文件数</span><span class="result-value">{{ exportResult.data.total }}</span></div>
           <div class="result-row"><span class="result-label">最大尺寸</span><span class="result-value">{{ exportResult.data.maxWidth }} × {{ exportResult.data.maxHeight }} px</span></div>
-          <div class="result-row"><span class="result-label">最终画布</span><span class="result-value">{{ exportResult.data.maxWidth + (sizeMode === 'auto' ? paddingW : 0) }} × {{ exportResult.data.maxHeight + (sizeMode === 'auto' ? paddingH : 0) }} px</span></div>
+          <div class="result-row"><span class="result-label">最终画布</span><span class="result-value">{{ exportResult.data.maxWidth + (sizeMode === 'auto' ? paddingW + alignPadLeft + alignPadRight : 0) }} × {{ exportResult.data.maxHeight + (sizeMode === 'auto' ? paddingH + alignPadTop + alignPadBottom : 0) }} px</span></div>
           <div class="result-row"><span class="result-label">输出目录</span><span class="result-value result-path">{{ exportResult.data.outputDir }}</span></div>
         </div>
         <div v-else-if="exportResult && !exportResult.success" class="result-detail">
@@ -251,6 +274,10 @@ const exportWidth = ref(0);
 const exportHeight = ref(0);
 const paddingW = ref(10);
 const paddingH = ref(10);
+const alignPadTop = ref(getSetting("batchAlignPadT", 0));
+const alignPadRight = ref(getSetting("batchAlignPadR", 0));
+const alignPadBottom = ref(getSetting("batchAlignPadB", 0));
+const alignPadLeft = ref(getSetting("batchAlignPadL", 0));
 const anchor = ref<AnchorType>("middle-center");
 const isExporting = ref(false);
 var fontWarning = reactive({ visible: false, label: "", onConfirm: () => {} });
@@ -342,6 +369,10 @@ function buildConfig(theItems: ExportPresetItem[]): BatchExportConfig {
     exportHeight: sizeMode.value === "manual" ? exportHeight.value : 0,
     paddingW: sizeMode.value === "auto" ? paddingW.value : 0,
     paddingH: sizeMode.value === "auto" ? paddingH.value : 0,
+    paddingTop: alignPadTop.value,
+    paddingRight: alignPadRight.value,
+    paddingBottom: alignPadBottom.value,
+    paddingLeft: alignPadLeft.value,
     anchor: anchor.value, outputDir: outputDir.value,
     fontName: info ? info.fontName : "", fontStyle: info ? info.fontStyle : "",
     fontScriptName: info ? info.fontScriptName : "", fontSize: info ? info.fontSize : 12,
@@ -422,6 +453,10 @@ function fillFormFromPreset(preset: ExportPreset) {
   anchor.value = preset.anchor || "middle-center";
   paddingW.value = preset.paddingW !== undefined ? preset.paddingW : 10;
   paddingH.value = preset.paddingH !== undefined ? preset.paddingH : 10;
+  alignPadTop.value = preset.paddingTop !== undefined ? preset.paddingTop : 0;
+  alignPadRight.value = preset.paddingRight !== undefined ? preset.paddingRight : 0;
+  alignPadBottom.value = preset.paddingBottom !== undefined ? preset.paddingBottom : 0;
+  alignPadLeft.value = preset.paddingLeft !== undefined ? preset.paddingLeft : 0;
 }
 
 // 用户点击预设卡片 → 填充 + 可选自动导出
@@ -459,6 +494,8 @@ function handleSavePreset() {
     name: name,
     items: [...items.value], prefix: prefix.value, format: format.value,
     anchor: anchor.value, paddingW: paddingW.value, paddingH: paddingH.value,
+    paddingTop: alignPadTop.value, paddingRight: alignPadRight.value,
+    paddingBottom: alignPadBottom.value, paddingLeft: alignPadLeft.value,
   });
   showToast("预设已保存：" + name);
 }
@@ -505,6 +542,10 @@ onMounted(async function () {
 watch(tableRows, function (val) { setSetting("tableRows", val); });
 watch(previewEnabled, function (val) { setSetting("previewEnabled", val); });
 watch(autoExportEnabled, function (val) { setSetting("autoExportEnabled", val); });
+watch(alignPadTop, function (val) { setSetting("batchAlignPadT", val); });
+watch(alignPadRight, function (val) { setSetting("batchAlignPadR", val); });
+watch(alignPadBottom, function (val) { setSetting("batchAlignPadB", val); });
+watch(alignPadLeft, function (val) { setSetting("batchAlignPadL", val); });
 
 onUnmounted(function () { stopPolling(); });
 </script>
@@ -618,4 +659,6 @@ input:checked + .slider:before { transform: translateX(14px); }
 .modal-body { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px; }
 .modal-footer { display: flex; justify-content: flex-end; }
 .modal-footer > * + * { margin-left: 8px; }
+
+.align-pad-table { margin-top: 10px; }
 </style>
