@@ -372,7 +372,7 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 3. 点击「开始导出」→ 创建 workDoc → 逐图层复制并归一化位置 → 锚点对齐 + 对齐边距偏移 → 导出
 
 **两层边距**：
-- `paddingW`/`paddingH`：画布扩展边距（`finalW = maxW + paddingW`）
+- `paddingW`/`paddingH`：画布延长（`finalW = maxW + paddingW`）
 - `paddingTop/Right/Bottom/Left`：对齐边距（边缘锚点时图层与画布边缘的额外距离）
 - 自动模式画布尺寸 = `maxSize + paddingW/H + padL+R + padT+B`
 

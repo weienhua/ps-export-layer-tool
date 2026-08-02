@@ -92,7 +92,7 @@
 
       <div v-if="sizeMode === 'auto'" class="canvas-size-table">
         <div class="canvas-size-row canvas-size-header">
-          <span class="cs-col-label"></span><span class="cs-col-detect">检测值</span><span class="cs-col-pad">边距</span><span class="cs-col-result">最终尺寸</span>
+          <span class="cs-col-label"></span><span class="cs-col-detect">检测值</span><span class="cs-col-pad">延长</span><span class="cs-col-result">最终尺寸</span>
         </div>
         <div class="canvas-size-row">
           <span class="cs-col-label">宽度</span>
@@ -148,6 +148,7 @@
           <span class="cs-col-pad"><input type="number" v-model="alignPadLeft" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
         </div>
       </div>
+      <div class="filename-hint">图层按照宽高锚点对齐以后四周的额外边距</div>
 
       <div class="section-divider"></div>
 
