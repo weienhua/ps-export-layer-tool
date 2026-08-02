@@ -200,3 +200,16 @@ export function sanitizeFilenameChar(ch: string): string {
   if (ch === "|") return "_";
   return ch;
 }
+
+/**
+ * 对完整字符串逐字符 sanitize
+ * @param name 原始字符串
+ * @returns sanitize 后的安全字符串
+ */
+export function sanitizeFilename(name: string): string {
+  var result = "";
+  for (var i = 0; i < name.length; i++) {
+    result += sanitizeFilenameChar(name.charAt(i));
+  }
+  return result;
+}

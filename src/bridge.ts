@@ -9,7 +9,7 @@
 const DEBUG = (window as any).DEBUG || false;
 
 // 类型导入
-import type { TextLayerInfo, BatchExportConfig, BatchExportResult, SelectedLayersInfo, BatchExportLayersConfig, BatchExportLayersResult, MeasureLayersResult } from "./types";
+import type { TextLayerInfo, BatchExportConfig, BatchExportResult, SelectedLayersInfo, BatchExportLayersConfig, BatchExportLayersResult, MeasureLayersResult, FreeExportConfig, FreeExportResult } from "./types";
 
 /**
  * 通信日志回调类型
@@ -275,6 +275,17 @@ export class PSBridge {
     var configJson = JSON.stringify(config);
     return this.evalScript<BatchExportLayersResult>(
       "$.HostScript.batchExportLayers('" + this.escapeForSingleQuotedString(configJson) + "')"
+    );
+  }
+
+  /**
+   * 自由导出（每图层保留原始尺寸，各自导出）
+   * @param config 导出配置
+   */
+  async freeExport(config: FreeExportConfig): Promise<PSResult<FreeExportResult>> {
+    var configJson = JSON.stringify(config);
+    return this.evalScript<FreeExportResult>(
+      "$.HostScript.freeExport('" + this.escapeForSingleQuotedString(configJson) + "')"
     );
   }
 }

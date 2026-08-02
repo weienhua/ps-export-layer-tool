@@ -50,8 +50,9 @@
         <input type="text" v-model="prefix" placeholder="time_" />
       </div>
       <div class="preview-hint" v-if="prefix || items.length">
-        → {{ prefix || 'file_' }}{{ getFirstItemName() }}{{ suffix }}, ... {{ prefix || 'file_' }}{{ getLastItemName() }}{{ suffix }}
+        → {{ safePrefix || 'file_' }}{{ getFirstItemName() }}{{ suffix }}, ... {{ safePrefix || 'file_' }}{{ getLastItemName() }}{{ suffix }}
       </div>
+      <div class="filename-hint">文件名中的非法字符将自动替换为下划线</div>
 
       <!-- 导出项表格（内嵌在配置卡片中） -->
       <div class="items-inline">
@@ -231,6 +232,7 @@ import AnchorGrid from "./AnchorGrid.vue";
 import ExportPresetList from "./ExportPresetList.vue";
 import { useExportPreset } from "../composables/useExportPreset";
 import { getSetting, setSetting, outputDir } from "../composables/settings";
+import { sanitizeFilename } from "../composables/filenameUtils";
 import type { AnchorType, ExportFormat, SizeMode, TextLayerInfo, ExportPreset } from "../types";
 import type { BatchExportConfig, ExportPresetItem } from "../types";
 
@@ -266,6 +268,7 @@ const detectedMaxH = ref(0);
 const isMeasuring = ref(false);
 
 const suffix = computed(function () { return format.value === "png" ? ".png" : ".jpg"; });
+const safePrefix = computed(function () { return sanitizeFilename(prefix.value); });
 const canExport = computed(function () { return items.value.length > 0; });
 
 function sanitizePreview(ch: string): string {
@@ -334,7 +337,7 @@ async function doDetectSize() {
 function buildConfig(theItems: ExportPresetItem[]): BatchExportConfig {
   var info = fontInfo.value;
   return {
-    items: theItems, prefix: prefix.value, format: format.value, sizeMode: sizeMode.value,
+    items: theItems, prefix: sanitizeFilename(prefix.value), format: format.value, sizeMode: sizeMode.value,
     exportWidth: sizeMode.value === "manual" ? exportWidth.value : 0,
     exportHeight: sizeMode.value === "manual" ? exportHeight.value : 0,
     paddingW: sizeMode.value === "auto" ? paddingW.value : 0,
@@ -516,6 +519,7 @@ onUnmounted(function () { stopPolling(); });
 .font-info-value { color: var(--text-main); display: flex; align-items: center; }
 .color-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border-strong); margin-right: 6px; }
 .preview-hint { margin-top: 4px; font-size: 10px; color: var(--text-muted); font-family: Consolas, Monaco, monospace; }
+.filename-hint { margin-top: 2px; font-size: 10px; color: var(--text-muted); }
 
 .mode-switch { display: flex; margin-bottom: 10px; }
 .mode-switch > * + * { margin-left: 4px; }

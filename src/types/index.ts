@@ -173,3 +173,43 @@ export interface MeasureLayersResult {
   finalWidth: number;
   finalHeight: number;
 }
+
+// ── 自由导出类型 ──
+
+/**
+ * 自由导出图层信息（面板侧用，包含用户可编辑字段）
+ * 基于 LayerInfo 扩展，增加导出文件名编辑能力
+ */
+export interface FreeExportLayerInfo {
+  layerId: number;
+  layerName: string;
+  kind: number;
+  kindName: string;
+  width: number;
+  height: number;
+  /** 用户可编辑的导出文件名（不含扩展名），默认 = layerName */
+  exportFileName: string;
+}
+
+/**
+ * 自由导出配置（面板 → 宿主）
+ * 每个图层保留原始尺寸，四方向边距独立配置
+ */
+export interface FreeExportConfig {
+  layers: Array<{ layerId: number; exportFileName: string }>;
+  format: ExportFormat;
+  paddingTop: number;
+  paddingRight: number;
+  paddingBottom: number;
+  paddingLeft: number;
+  outputDir: string;
+  reversed: boolean;
+}
+
+/**
+ * 自由导出结果（宿主 → 面板）
+ */
+export interface FreeExportResult {
+  total: number;
+  outputDir: string;
+}

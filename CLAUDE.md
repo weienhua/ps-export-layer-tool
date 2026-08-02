@@ -25,13 +25,16 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   │   ├── DebugPanel.vue     # 调试面板（通信日志）
 │   │   ├── TabBar.vue         # Tab 导航栏
 │   │   ├── BatchExportTab.vue # 文字导出 Tab（预设系统 + items 编辑 + 一键导出）
+│   │   ├── LayersExportTab.vue # 统一导出 Tab（多图层统一画布 + 锚点对齐）
+│   │   ├── FreeExportTab.vue  # 自由导出 Tab（每图层原始尺寸 + 四方向边距）
 │   │   ├── ExportPresetList.vue # 预设卡片列表（拖拽排序 + hover 预览）
 │   │   ├── SectionCollapsible.vue # 可折叠卡片区域（折叠状态持久化到 localStorage）
 │   │   └── AnchorGrid.vue     # 3×3 锚点网格选择器 + 下拉框
 │   ├── composables/
 │   │   ├── useToast.ts        # Toast composable（inject）
 │   │   ├── useExportPreset.ts # 预设 CRUD（文件 + localStorage 双写）
-│   │   └── settings.ts        # 面板设置统一持久化（localStorage）
+│   │   ├── settings.ts        # 面板设置统一持久化（localStorage）
+│   │   └── filenameUtils.ts   # 文件名 sanitize 工具（面板侧，与宿主 exportUtils 一致）
 │   ├── types/
 │   │   ├── index.ts           # 共享类型：AnchorType, ExportFormat, TextLayerInfo, BatchExportConfig(items代替characters), BatchExportResult, ExportPreset, ExportPresetItem 等
 │   │   └── cep-panel.d.ts     # CSInterface 全局类型（最小化声明）
@@ -50,7 +53,10 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │       │   ├── utils.ts       # 通用工具（log、rgbToHex、roundValue）
 │       │   ├── document.ts    # 文档/图层基础查询
 │       │   ├── fileOps.ts     # 文件系统操作
-│       │   └── batchExport.ts # 批量导出（文本检测 + 字符测量 + 批量导出，全部 raw ActionManager）
+│       │   ├── batchExport.ts # 批量导出（文本检测 + 字符测量 + 批量导出，全部 raw ActionManager）
+│       │   ├── layersExport.ts# 统一画布导出（多图层）
+│       │   ├── freeExport.ts  # 自由导出（单 workDoc 复用 + 四方向边距）
+│       │   └── exportUtils.ts # 导出通用工具（跨文档复制、画布裁剪、锚点计算、文件名 sanitize）
 │       └── ps-api/            # photoshop-script-api 子项目（vendored，ES3 兼容）
 ├── dist/                      # 构建产物，不要手动编辑
 │   ├── index.html / bundle.js # 面板产物（CSS 打包进 bundle.js）
@@ -263,7 +269,8 @@ src/jsx/
 │   ├── fileOps.ts         # 文件系统操作
 │   ├── batchExport.ts     # 批量导出（文本检测 + 字符测量 + 批量导出）
 │   ├── layersExport.ts    # 统一画布导出（多图层）
-│   └── exportUtils.ts     # 导出通用工具（跨文档复制、画布裁剪、锚点计算）
+│   ├── freeExport.ts      # 自由导出（单 workDoc 复用 + 四方向边距）
+│   └── exportUtils.ts     # 导出通用工具（跨文档复制、画布裁剪、锚点计算、文件名 sanitize）
 └── ps-api/                # photoshop-script-api（vendored）
 ```
 
@@ -284,6 +291,7 @@ src/jsx/
 | `getSelectedLayersInfo()` | layersExport.ts | 读取选中图层的名称/类型/尺寸 |
 | `measureLayers()` | layersExport.ts | 测量选中图层的最大宽高 |
 | `batchExportLayers(configJson)` | layersExport.ts | 统一画布批量导出（多图层，固定尺寸 + 对齐） |
+| `freeExport(configJson)` | freeExport.ts | 自由导出（多图层，各自原始尺寸 + 四方向边距） |
 
 ```typescript
 // 在对应模块文件中定义并导出函数（如 modules/document.ts）
@@ -330,7 +338,7 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 - **TabBar**：三 tab 导航（「统一导出」「文字导出」「自由导出」），选中状态持久化到 `exportLayerTool.settings.v1`
 - **统一导出** tab：选中多个图层 → 统一画布尺寸，各自导出（`LayersExportTab`）
 - **文字导出** tab：选中文本图层 → 按字符批量导出（`BatchExportTab`，预设系统）
-- **自由导出** tab：占位（后续实现，不固定画布，图层原始尺寸导出）
+- **自由导出** tab：选中多个图层 → 保留各自原始尺寸 + 四方向边距，独立导出（`FreeExportTab`）
 
 ### 文字导出 Tab（BatchExportTab）
 
@@ -365,9 +373,17 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 
 **与文字导出 Tab 的区别**：操作对象是图层（非文字内容），不解析文本，不支持预设系统。
 
-### 自由导出 Tab
+### 自由导出 Tab（FreeExportTab）
 
-占位，待实现。计划功能：不固定画布尺寸，每个图层保留原始尺寸独立导出。
+选中多个图层后，每个图层保留原始尺寸独立导出（PNG/JPG），不强制统一画布。
+
+**核心流程**：
+1. 轮询检测选中图层（1s 间隔）→ 显示图层名称/类型/尺寸列表
+2. 表格中可编辑每图层的导出文件名（默认 = 图层名），实时检测命名冲突
+3. 配置四方向边距（上/右/下/左，默认 2px）、导出格式、输出目录
+4. 点击「开始导出」→ 面板侧完成 sanitize + 冲突序号追加 → host 单 workDoc 复用逐图层导出
+
+**与统一导出 Tab 的区别**：每图层独立画布尺寸（layer.bounds + 边距），不做锚点对齐，仅 normalize 后平移 (左边距, 上边距)。
 
 ### 其他基础组件
 
@@ -392,7 +408,7 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 | 文件 | 作用域 | 内容 |
 |------|--------|------|
 | `src/types/cep-panel.d.ts` | 面板侧 | `CSInterface` 类、`HostEnvironment`、`CSEvent` |
-| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息，含 activeEffects/opacity/fontAvailable）、`BatchExportConfig`（导出配置）、`BatchExportResult`（导出结果）、`ExportPreset`、`ExportPresetItem` |
+| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息）、`BatchExportConfig`（导出配置）、`BatchExportResult`（导出结果）、`ExportPreset`、`ExportPresetItem`、`LayerInfo`、`BatchExportLayersConfig`、`BatchExportLayersResult`、`FreeExportLayerInfo`、`FreeExportConfig`、`FreeExportResult` |
 | `src/jsx/modules/types.d.ts` | 宿主脚本侧 | ActionManager 全局 API（`executeActionGet`、`stringIDToTypeID` 等） |
 | `ps-extendscript-types`（npm） | 宿主脚本侧 | PS ExtendScript DOM（`app`、`Document`、`ArtLayer` 等） |
 

@@ -13,10 +13,8 @@
     <!-- 统一导出 Tab -->
     <LayersExportTab v-else-if="activeTab === 'layers'" />
 
-    <!-- 自由导出 Tab（待实现） -->
-    <div v-else-if="activeTab === 'free'" class="placeholder-tab">
-      <p>自由导出 — 保留图层原始尺寸，各自导出</p>
-    </div>
+    <!-- 自由导出 Tab -->
+    <FreeExportTab v-else-if="activeTab === 'free'" />
 
     <StatusBar :message="statusMsg" :isError="statusError" />
     <DebugPanel />
@@ -33,6 +31,7 @@ import Toast from "./components/Toast.vue";
 import TabBar from "./components/TabBar.vue";
 import BatchExportTab from "./components/BatchExportTab.vue";
 import LayersExportTab from "./components/LayersExportTab.vue";
+import FreeExportTab from "./components/FreeExportTab.vue";
 
 // 状态管理
 const statusMsg = ref("就绪");
@@ -95,13 +94,4 @@ onUnmounted(() => {
   letter-spacing: 0.2px;
 }
 
-.placeholder-tab {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 16px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
 </style>

@@ -25,12 +25,12 @@ npm run package            # 生产模式构建 + 打包发布文件（zip + 安
 
 - 面板侧: Vue 3 SFC 组件化架构
   - 入口: `src/main.ts` → `src/App.vue`
-  - 组件: `src/components/*.vue`（`<script setup lang="ts">`），含 TabBar、BatchExportTab、ExportPresetList、SectionCollapsible、AnchorGrid 等
+  - 组件: `src/components/*.vue`（`<script setup lang="ts">`），含 TabBar、BatchExportTab、LayersExportTab、FreeExportTab、ExportPresetList、SectionCollapsible、AnchorGrid 等
   - 组合式函数: `src/composables/useToast.ts`、`useExportPreset.ts`、`settings.ts`
   - 共享类型: `src/types/index.ts`（AnchorType, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig(items代替characters), BatchExportResult, ExportPreset, ExportPresetItem）
 - 宿主侧: `src/jsx/hostscript.ts` + `src/jsx/modules/` → webpack(ts-loader, target: ES3) → `dist/jsx/hostscript.js`
   - 入口: `src/jsx/hostscript.ts`（import + $.HostScript 注册）
-  - 模块: `src/jsx/modules/`（utils、document、fileOps、batchExport、layersExport、exportUtils）
+  - 模块: `src/jsx/modules/`（utils、document、fileOps、batchExport、layersExport、freeExport、exportUtils）
   - 共享类型: `src/jsx/modules/types.d.ts`（ActionManager API 声明）
 - 宿主工具库: `src/jsx/ps-api/`（photoshop-script-api，vendored），所有类须从 `src/jsx/ps-api/src/index.ts` 统一导入，禁止从 `lib/` 子路径单独导入（会导致 webpack 模块冲突）
 - 类型: `src/types/cep-panel.d.ts`（面板）/ `ps-extendscript-types`（宿主）
@@ -61,6 +61,7 @@ $.HostScript = {
   getSelectedLayersInfo,// 选中图层信息（名称/类型/尺寸）
   measureLayers,        // 测量选中图层最大宽高
   batchExportLayers,    // 统一画布批量导出（多图层）
+  freeExport,           // 自由导出（各自原始尺寸 + 四方向边距）
 };
 ```
 
