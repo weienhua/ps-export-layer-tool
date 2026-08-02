@@ -1,6 +1,6 @@
 {
   "name": "ps-export-layer-tool",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "PS 图层导出工具",
   "scripts": {
     "build": "npm run build:jsx && npm run build:panel",
