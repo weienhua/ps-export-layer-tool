@@ -73,6 +73,7 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   ├── install.js             # 自动安装脚本
 │   ├── uninstall.js           # 卸载脚本
 │   ├── build-installer.js     # 打包脚本（zip + pkg 可执行文件）
+│   ├── verify-export-alignment.js # 导出像素校验（零依赖 PNG 解码，输出画布尺寸/内容包围盒/四周留白）
 │   └── release.js             # 发布脚本
 ├── tsconfig.json              # 面板侧：target ES6，jsx: preserve，排除 src/jsx/
 ├── tsconfig.jsx.json          # 宿主侧：target ES3，types: [ps-extendscript-types]
@@ -93,6 +94,7 @@ npm run dev:panel          # 仅面板 webpack watch（开发模式）
 npm run dev:jsx            # 仅宿主 webpack watch（开发模式）
 npm run clean              # rimraf dist installer
 npm run package            # 生产模式构建 + 打包发布文件（zip + 安装程序）到 installer/
+npm run verify:export      # 导出像素校验（对目录/PNG 输出画布尺寸 + 内容包围盒 + 四周留白）
 ```
 
 ### 打包产物
@@ -293,6 +295,8 @@ src/jsx/
 | `batchExportLayers(configJson)` | layersExport.ts | 统一画布批量导出（多图层，固定尺寸 + 对齐） |
 | `freeExport(configJson)` | freeExport.ts | 自由导出（多图层，各自原始尺寸 + 四方向边距） |
 
+**宿主脚本版本戳**：`hostscript.ts` 里 `var HOST_SCRIPT_VERSION = "..."` 同时挂到 `$.HostScriptVersion`，并由 `batchExport` 结果字段 `hostVersion` 回传（面板结果卡片不展示，仅供调试/日志核对）。改动宿主逻辑后**必须同步递增该版本号**，用于区分「代码 bug」与「PS 缓存了旧脚本」。
+
 ```typescript
 // 在对应模块文件中定义并导出函数（如 modules/document.ts）
 export function getDocumentInfo(): string {
@@ -347,18 +351,34 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 **核心流程**：
 1. 轮询检测选中图层 → 自动读取字体/字号/颜色/不透明度/效果/字体可用性
 2. 选择预设（22 个内置预设，支持自定义）自动填充导出项列表和配置
-3. 编辑导出项（渲染文本 + 文件后缀）、文件名前缀、画布尺寸、对齐方式、对齐边距（四方向）
+3. 逐项编辑：渲染文本 + 文件后缀 + **分轴勾选（宽 / 高）**；以及文件名前缀、画布尺寸、对齐方式、对齐边距（四方向）
 4. 点击「开始导出」或开启「应用后自动导出」→ 复制源图层为模板 → 逐字符复制模板层 + 改文字 → 导出
    - 所有文本属性、图层效果、不透明度通过复制自然继承，无需逐项 set
 
+**分轴统一 / 按内容裁剪（`ExportPresetItem.unifyWidth` / `unifyHeight`）**：
+每个导出项有「宽」「高」两个独立勾选，两轴可自由组合（全统一 / 只统一宽 / 只统一高 / 全裁剪）：
+- **勾选轴（统一）**：画布尺寸取该轴统一值（auto = 该轴参与统一项的最大内容尺寸 + 边距；manual = 用户输入值），
+  再走原 `calcAnchorOffsetX/Y` + 溢出钳制（`clampAnchorOffset`）定位，行为与引入分轴前逐像素一致
+- **未勾选轴（裁剪）**：画布尺寸 = `Math.ceil(bounds轴尺寸) + paddingW/H + 该轴两侧对齐边距`，无多余透明像素
+- 两轴的最大值可来自不同项：`maxW` 只统计 `unifyWidth !== false` 的项，`maxH` 只统计 `unifyHeight !== false` 的项
+- 某轴无任何项参与统一时该轴画布返回 `0`，该项按内容裁剪；`measureCharacters` 同样分轴统计，保证检测值与导出结果一致
+- 画布尺寸逐项变化，宿主按 `ensureCanvasSize` 仅在尺寸变化时 `resizeCanvasWithAnchor`（top-left 锚点）
+- 未勾选轴复用 `paddingW`/`paddingH`（画布延长）+ 四方向对齐边距，不新增独立边距配置
+
+**分轴勾选的持久化（重要）**：
+- **只有点击「保存为预设」才会写盘**（`handleSavePreset` → `toPresetItems()` 把勾选落成显式 `true`/`false`）
+- 勾选本身**不触发任何持久化**：`setItemUnify` 只改当前表单，`useExportPreset.normalize()` 也只在内存补默认值、不回写文件
+- 兼容旧数据：`unifyWidth`/`unifyHeight` 缺失一律视为「勾选」。三处兜底 —— 加载时 `normalize()` 补 `true`、应用到表单时 `fillFormFromPreset()` 用 `!== false` 判定、宿主 `isUnifyAxis()` 用 `!== false` 判定
+- 因此内置预设与旧预设文件（`default.json` 里没有这两个字段）无需迁移，行为与分轴功能引入前完全一致
+
 **预设系统**：
 - 预设卡片列表（底部），支持拖拽排序、hover 预览、自动导出开关
-- 预设存储完整配置（items + prefix + format + anchor + paddingW/H + paddingTop/Right/Bottom/Left）
+- 预设存储完整配置（items〔含 unifyWidth/unifyHeight〕 + prefix + format + anchor + paddingW/H + paddingTop/Right/Bottom/Left）
 - 数据存储：`dist/lib/presets/default.json` + localStorage `exportLayerTool.presets.v1`
 - 面板设置统一存储：`exportLayerTool.settings.v1`
 
 **子组件**：
-- **ExportPresetList**：预设卡片列表（拖拽排序 + hover 预览 + 预览开关）
+- **ExportPresetList**：预设卡片列表（拖拽排序 + hover 预览 + 预览开关；预览含「分轴: N 项裁剪宽，M 项裁剪高」摘要）
 - **SectionCollapsible**：可折叠卡片，状态持久化到 localStorage
 - **AnchorGrid**：3×3 锚点网格 + 下拉选择器
 
@@ -413,7 +433,7 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 | 文件 | 作用域 | 内容 |
 |------|--------|------|
 | `src/types/cep-panel.d.ts` | 面板侧 | `CSInterface` 类、`HostEnvironment`、`CSEvent` |
-| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息）、`BatchExportConfig`（导出配置）、`BatchExportResult`（导出结果）、`ExportPreset`、`ExportPresetItem`、`LayerInfo`、`BatchExportLayersConfig`、`BatchExportLayersResult`、`FreeExportLayerInfo`、`FreeExportConfig`、`FreeExportResult` |
+| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息）、`BatchExportConfig`（导出配置）、`BatchExportResult`（导出结果，含 `unifiedWCount`/`unifiedHCount`/`trimmedCount`/`skippedCount`/`skipReason`/`hostVersion`）、`ExportPreset`、`ExportPresetItem`（`text`/`name`/`unifyWidth`/`unifyHeight`）、`LayerInfo`、`BatchExportLayersConfig`、`BatchExportLayersResult`、`FreeExportLayerInfo`、`FreeExportConfig`、`FreeExportResult` |
 | `src/jsx/modules/types.d.ts` | 宿主脚本侧 | ActionManager 全局 API（`executeActionGet`、`stringIDToTypeID` 等） |
 | `ps-extendscript-types`（npm） | 宿主脚本侧 | PS ExtendScript DOM（`app`、`Document`、`ArtLayer` 等） |
 
@@ -502,6 +522,9 @@ Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.12" -Name "PlayerDebugMode" -V
 | 边距太小导致裁切 | 默认 `paddingW=2, paddingH=3` | 默认改为 10/10，保存在预设中 |
 | 字体缺失导出弹窗 | 导出时 PS 弹出字体管理对话框 | `app.displayDialogs = DialogModes.NO` 全局压制，PS 自动用默认字体替换 |
 | 预设文件被覆盖 | `load()` 从 bundle 写入文件 | 不再内置回写，数据仅来自文件 + localStorage |
+| 导出结果为纯透明/空白图 | 复制隐藏的模板层得到的副本**也是隐藏的**，而 `saveAs` 只渲染可见图层 | 用 `duplicateLayer()`（内部已 `show()`），并在 `saveAs` 前加可见性兜底：`if (!app.activeDocument.activeLayer.visible) visible = true` |
+| 结果与代码不符（改动不生效） | PS 缓存了旧宿主脚本，`dist/jsx/hostscript.js` 未重新加载 | 重启 PS；需要核对时看 `batchExport` 结果里的 `hostVersion` 是否等于 `hostscript.ts` 的 `HOST_SCRIPT_VERSION` |
+| 分轴勾选没被保存 | 勾选只改当前表单，**设计上不会自动写盘** | 点「保存为预设」才会持久化；旧预设没有 `unifyWidth`/`unifyHeight` 字段时一律按「勾选」处理 |
 
 ## 会话交接约定
 

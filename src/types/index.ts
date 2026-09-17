@@ -9,6 +9,16 @@
 export interface ExportPresetItem {
   text: string;   // PS 中渲染的文本内容
   name?: string;  // 文件名标识，空则 fallback 到 sanitize(text)
+  /**
+   * 宽度参与统一画布：true / undefined = 宽度统一；false = 按内容裁剪宽度
+   * 裁剪轴画布尺寸 = ceil(bounds.width) + paddingW + paddingLeft + paddingRight
+   */
+  unifyWidth?: boolean;
+  /**
+   * 高度参与统一画布：true / undefined = 高度统一；false = 按内容裁剪高度
+   * 裁剪轴画布尺寸 = ceil(bounds.height) + paddingH + paddingTop + paddingBottom
+   */
+  unifyHeight?: boolean;
 }
 
 /**
@@ -128,6 +138,18 @@ export interface BatchExportResult {
   total: number;
   maxWidth: number;
   maxHeight: number;
+  /** 参与统一宽度的项数（0 = 宽度全部按内容裁剪） */
+  unifiedWCount?: number;
+  /** 参与统一高度的项数（0 = 高度全部按内容裁剪） */
+  unifiedHCount?: number;
+  /** 含按内容裁剪轴的项数 */
+  trimmedCount?: number;
+  /** 因内容为空被跳过的项数 */
+  skippedCount?: number;
+  /** 跳过原因（诊断用） */
+  skipReason?: string;
+  /** 宿主脚本版本号（确认 PS 是否加载最新脚本） */
+  hostVersion?: string;
   outputDir: string;
 }
 

@@ -65,6 +65,14 @@ export function useExportPreset() {
       if (p.paddingRight === undefined) p.paddingRight = 0;
       if (p.paddingBottom === undefined) p.paddingBottom = 0;
       if (p.paddingLeft === undefined) p.paddingLeft = 0;
+      // 分轴统一字段补齐为 true：旧预设/内置预设行为不变，落盘结构明确
+      var items = p.items;
+      if (items) {
+        for (var j = 0; j < items.length; j++) {
+          if (items[j].unifyWidth === undefined) items[j].unifyWidth = true;
+          if (items[j].unifyHeight === undefined) items[j].unifyHeight = true;
+        }
+      }
     }
     return data;
   }

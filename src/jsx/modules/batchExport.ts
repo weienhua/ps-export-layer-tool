@@ -7,7 +7,7 @@
 
 import { Document, Layer } from "../ps-api/src/index";
 import { ensureDirectory } from "./fileOps";
-import { duplicateSourceLayer, duplicateLayer, resizeCanvasWithAnchor, translateLayerBy, calcAnchorOffsetX, calcAnchorOffsetY, sanitizeFilenameChar } from "./exportUtils";
+import { duplicateSourceLayer, duplicateLayer, resizeCanvasWithAnchor, translateLayerBy, calcAnchorOffsetX, calcAnchorOffsetY, clampAnchorOffset, calcAxisCanvasSize, sanitizeFilenameChar } from "./exportUtils";
 
 function componentToHex(c: number): string {
   var hex = c.toString(16).toUpperCase();
@@ -395,45 +395,37 @@ export function batchExport(configJson: string): string {
     // 隐藏模板层，防止原始文字残留到导出图中
     templateLayer.hide();
 
-    var measuredChars: Array<{
-      text: string;
-      name: string;
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-    }> = [];
     var maxW = 0;
     var maxH = 0;
+
+    // 统一画布尺寸（仅统计该轴参与统一的项，两轴可以来自不同项）
+    var unifiedWCount = 0;
+    var unifiedHCount = 0;
 
     // ==================== Phase 2: 逐字符测量（仅自动模式） ====================
     if (sizeMode === "auto") {
       for (var i = 0; i < items.length; i++) {
         var itemText = items[i].text;
-        var itemName = items[i].name || sanitizeFilenameChar(itemText);
 
         // 复制模板层 → 改文字（属性/效果/不透明度全保留）
         var layer = duplicateLayer(templateLayer.id);
         changeLayerText(itemText);
 
         var bounds = layer.bounds();
-        var charW = Math.ceil(bounds.width);
-        var charH = Math.ceil(bounds.height);
 
-        measuredChars.push({
-          text: itemText,
-          name: itemName,
-          x: bounds.x,
-          y: bounds.y,
-          w: charW,
-          h: charH,
-        });
-
-        if (charW > maxW) {
-          maxW = charW;
+        if (isUnifyAxis(items[i].unifyWidth)) {
+          var charW = Math.ceil(bounds.width);
+          if (charW > maxW) {
+            maxW = charW;
+          }
+          unifiedWCount++;
         }
-        if (charH > maxH) {
-          maxH = charH;
+        if (isUnifyAxis(items[i].unifyHeight)) {
+          var charH = Math.ceil(bounds.height);
+          if (charH > maxH) {
+            maxH = charH;
+          }
+          unifiedHCount++;
         }
 
         try {
@@ -444,13 +436,17 @@ export function batchExport(configJson: string): string {
       }
     }
 
-    // 计算最终画布尺寸
-    var finalW = maxW;
-    var finalH = maxH;
+    // 计算统一画布尺寸（两轴各自基于参与统一的项；该轴无统一项时返回 0）
+    var finalW = 0;
+    var finalH = 0;
 
     if (sizeMode === "auto") {
-      finalW = maxW + paddingW + padL + padR;
-      finalH = maxH + paddingH + padT + padB;
+      if (unifiedWCount > 0) {
+        finalW = maxW + paddingW + padL + padR;
+      }
+      if (unifiedHCount > 0) {
+        finalH = maxH + paddingH + padT + padB;
+      }
     } else {
       if (exportWidth > 0) {
         finalW = exportWidth;
@@ -460,179 +456,152 @@ export function batchExport(configJson: string): string {
       }
     }
 
-    // ==================== Phase 3: 缩小画布到目标尺寸 ====================
-    // raw ActionManager: resizeCanvas，使用 top-left 锚点保证原点仍在 (0,0)
-    resizeCanvasWithAnchor(
-      workDoc,
-      finalW,
-      finalH,
-      charIDToTypeID("Left"),
-      charIDToTypeID("Top ")
-    );
+    // ==================== Phase 3 + Phase 4: 逐项按轴定位后导出 ====================
+    // 画布尺寸按轴决定：统一轴用统一尺寸，裁剪轴用「内容 + 两层边距」；
+    // 画布尺寸变化时才 resize（top-left 锚点保证原点仍在 (0,0)）
+    var tplW = Math.ceil(templateBounds.width);
+    var tplH = Math.ceil(templateBounds.height);
+    if (sizeMode === "auto" && finalW === 0) {
+      finalW = tplW + paddingW + padL + padR;
+    }
+    if (sizeMode === "auto" && finalH === 0) {
+      finalH = tplH + paddingH + padT + padB;
+    }
 
-    // ==================== Phase 4: 逐字符导出 ====================
     var isPng = format === "png";
     var ext = isPng ? ".png" : ".jpg";
     var exportCount = 0;
+    var trimmedCount = 0;
+    var skippedCount = 0;
+    var lastSkipReason = "";
 
-    if (sizeMode === "auto") {
-      // 自动模式：遍历测量结果
-      for (var j = 0; j < measuredChars.length; j++) {
-        var measured = measuredChars[j];
-        var expTextStr = measured.text;
-        var expName = measured.name;
+    // 画布尺寸跟踪：初始化时的 workDocSize 已是实际画布尺寸，后续按需 resize
+    var canvasW = workDocSize;
+    var canvasH = workDocSize;
 
-        // 复制模板层 → 改文字（属性/效果/不透明度全保留）
-        var exportLayer = duplicateLayer(templateLayer.id);
-        changeLayerText(expTextStr);
+    for (var j = 0; j < items.length; j++) {
+      var expItem = items[j];
+      var expTextStr = expItem.text;
+      var expName = expItem.name || sanitizeFilenameChar(expTextStr);
 
-        var exportBounds = exportLayer.bounds();
+      var itemUnifyW = isUnifyAxis(expItem.unifyWidth);
+      var itemUnifyH = isUnifyAxis(expItem.unifyHeight);
 
-        // 计算偏移（传入对齐边距）
-        var translateX = calcAnchorOffsetX(
-          anchor,
-          exportBounds.x,
-          exportBounds.width,
-          finalW,
-          padL,
-          padR
-        );
-        var translateY = calcAnchorOffsetY(
-          anchor,
-          exportBounds.y,
-          exportBounds.height,
-          finalH,
-          padT,
-          padB
-        );
+      if (!itemUnifyW || !itemUnifyH) {
+        trimmedCount++;
+      }
 
-        // 检查移动后的边界，避免文本超出画布（含对齐边距）
-        var movedTop = exportBounds.y + translateY;
-        var movedBottom = exportBounds.y + exportBounds.height + translateY;
-        var movedLeft = exportBounds.x + translateX;
-        var movedRight = exportBounds.x + exportBounds.width + translateX;
+      // 复制模板层 → 改文字（属性/效果/不透明度全保留）
+      // 使用 duplicateLayer：其内部会调用 show()，避免复制出隐藏图层导致导出空白
+      var exportLayer = duplicateLayer(templateLayer.id);
+      changeLayerText(expTextStr);
 
-        if (exportBounds.height <= finalH) {
-          if (movedTop < padT) {
-            translateY -= movedTop - padT;
-          } else if (movedBottom > finalH - padB) {
-            translateY -= movedBottom - (finalH - padB);
-          }
-        }
-        if (exportBounds.width <= finalW) {
-          if (movedLeft < padL) {
-            translateX -= movedLeft - padL;
-          } else if (movedRight > finalW - padR) {
-            translateX -= movedRight - (finalW - padR);
-          }
-        }
+      var exportBounds = exportLayer.bounds();
+      var boundsW = Math.ceil(exportBounds.width);
+      var boundsH = Math.ceil(exportBounds.height);
 
-        // 平移图层
-        translateLayerBy(translateX, translateY);
-
-        // 导出文件名
-        var filename = prefix + expName + ext;
-
-        // saveAs 使用 PS 主渲染引擎，避免 Save for Web 的文本裁切 bug
-        var filePath1 = outputDir + "/" + filename;
-        if (isPng) {
-          // @ts-ignore
-          workDoc.saveAs(filePath1, "PNGFormat", true);
-        } else {
-          // @ts-ignore
-          workDoc.saveAs(filePath1, "JPEG", true);
-        }
-
+      // 空文本 / 无有效内容：跳过，避免生成 0 尺寸素材
+      if (boundsW <= 0 || boundsH <= 0) {
+        skippedCount++;
+        lastSkipReason = "empty-bounds " + boundsW + "x" + boundsH;
         try {
           exportLayer.remove();
-        } catch (eRemove) {
-          // 删除失败不阻断流程
+        } catch (eRemoveSkip) {
+          // 忽略
         }
-
-        exportCount++;
+        continue;
       }
-    } else {
-      // 手动模式：直接遍历 items，跳过单独测量阶段
-      for (var k = 0; k < items.length; k++) {
-        var itemText2 = items[k].text;
-        var itemName2 = items[k].name || sanitizeFilenameChar(itemText2);
 
-        // 复制模板层 → 改文字（属性/效果/不透明度全保留）
-        var exportLayer2 = duplicateLayer(templateLayer.id);
-        changeLayerText(itemText2);
+      // 按轴计算本项画布尺寸
+      var itemCanvasW = calcAxisCanvasSize(exportBounds.width, finalW, itemUnifyW, paddingW, padL, padR);
+      var itemCanvasH = calcAxisCanvasSize(exportBounds.height, finalH, itemUnifyH, paddingH, padT, padB);
 
-        var exportBounds2 = exportLayer2.bounds();
-        var charW2 = Math.ceil(exportBounds2.width);
-        var charH2 = Math.ceil(exportBounds2.height);
-
-        // 顺带统计最大尺寸（用于结果展示）
-        if (charW2 > maxW) maxW = charW2;
-        if (charH2 > maxH) maxH = charH2;
-
-        // 计算偏移（传入对齐边距）
-        var translateX2 = calcAnchorOffsetX(
-          anchor,
-          exportBounds2.x,
-          exportBounds2.width,
-          finalW,
-          padL,
-          padR
-        );
-        var translateY2 = calcAnchorOffsetY(
-          anchor,
-          exportBounds2.y,
-          exportBounds2.height,
-          finalH,
-          padT,
-          padB
-        );
-
-        // 检查移动后的边界，避免文本超出画布（含对齐边距）
-        var movedTop2 = exportBounds2.y + translateY2;
-        var movedBottom2 = exportBounds2.y + exportBounds2.height + translateY2;
-        var movedLeft2 = exportBounds2.x + translateX2;
-        var movedRight2 = exportBounds2.x + exportBounds2.width + translateX2;
-
-        if (exportBounds2.height <= finalH) {
-          if (movedTop2 < padT) {
-            translateY2 -= movedTop2 - padT;
-          } else if (movedBottom2 > finalH - padB) {
-            translateY2 -= movedBottom2 - (finalH - padB);
-          }
-        }
-        if (exportBounds2.width <= finalW) {
-          if (movedLeft2 < padL) {
-            translateX2 -= movedLeft2 - padL;
-          } else if (movedRight2 > finalW - padR) {
-            translateX2 -= movedRight2 - (finalW - padR);
-          }
-        }
-
-        // 平移图层
-        translateLayerBy(translateX2, translateY2);
-
-        // 导出文件名
-        var filename2 = prefix + itemName2 + ext;
-
-        // saveAs 使用 PS 主渲染引擎，避免 Save for Web 的文本裁切 bug
-        var filePath2 = outputDir + "/" + filename2;
-        if (isPng) {
-          // @ts-ignore
-          workDoc.saveAs(filePath2, "PNGFormat", true);
-        } else {
-          // @ts-ignore
-          workDoc.saveAs(filePath2, "JPEG", true);
-        }
-
+      if (itemCanvasW <= 0 || itemCanvasH <= 0) {
+        skippedCount++;
+        lastSkipReason = "zero-canvas " + itemCanvasW + "x" + itemCanvasH + " unifiedW=" + itemUnifyW + " unifiedH=" + itemUnifyH + " final=" + finalW + "x" + finalH;
         try {
-          exportLayer2.remove();
-        } catch (eRemove) {
-          // 删除失败不阻断流程
+          exportLayer.remove();
+        } catch (eRemoveSkip2) {
+          // 忽略
         }
-
-        exportCount++;
+        continue;
       }
+
+      ensureCanvasSize(workDoc as any, itemCanvasW, itemCanvasH, canvasW, canvasH);
+      canvasW = itemCanvasW;
+      canvasH = itemCanvasH;
+
+      // 计算偏移（传入对齐边距）
+      var translateX = calcAnchorOffsetX(
+        anchor,
+        exportBounds.x,
+        exportBounds.width,
+        itemCanvasW,
+        padL,
+        padR
+      );
+      var translateY = calcAnchorOffsetY(
+        anchor,
+        exportBounds.y,
+        exportBounds.height,
+        itemCanvasH,
+        padT,
+        padB
+      );
+
+      // 钳制到边距区间：统一轴保留锚点自由度，裁剪轴退化为贴边（内容 + 边距刚好占满画布）
+      translateX = clampAnchorOffset(
+        translateX,
+        exportBounds.width,
+        itemCanvasW,
+        padL,
+        padR
+      );
+      translateY = clampAnchorOffset(
+        translateY,
+        exportBounds.height,
+        itemCanvasH,
+        padT,
+        padB
+      );
+
+      // 平移图层
+      translateLayerBy(translateX, translateY);
+
+      // 可见性兜底：复制出的图层必须是可见的，否则导出为空白图（隐藏图层不参与 saveAs 渲染）
+      try {
+        var activeExportLayer = app.activeDocument.activeLayer;
+        if (!activeExportLayer.visible) {
+          activeExportLayer.visible = true;
+        }
+      } catch (eVis) {
+        // 忽略
+      }
+
+
+
+      // 导出文件名
+      var filename = prefix + expName + ext;
+
+      // saveAs 使用 PS 主渲染引擎，避免 Save for Web 的文本裁切 bug
+      var filePath1 = outputDir + "/" + filename;
+      if (isPng) {
+        // @ts-ignore
+        workDoc.saveAs(filePath1, "PNGFormat", true);
+      } else {
+        // @ts-ignore
+        workDoc.saveAs(filePath1, "JPEG", true);
+      }
+
+      try {
+        exportLayer.remove();
+      } catch (eRemove) {
+        // 删除失败不阻断流程
+      }
+
+      exportCount++;
     }
+
 
     // 关闭工作文档
     workDoc.close(false);
@@ -641,6 +610,12 @@ export function batchExport(configJson: string): string {
       total: exportCount,
       maxWidth: maxW,
       maxHeight: maxH,
+      unifiedWCount: unifiedWCount,
+      unifiedHCount: unifiedHCount,
+      trimmedCount: trimmedCount,
+      skippedCount: skippedCount,
+      skipReason: lastSkipReason,
+      hostVersion: getHostScriptVersion(),
       outputDir: outputDir,
     };
 
@@ -679,7 +654,6 @@ export function measureCharacters(configJson: string): string {
 
     var config = JSON.parse(configJson);
     var items = config.items;
-
     // 保存源文档和图层引用
     var srcDoc = app.activeDocument;
     var srcLayerId = srcDoc.activeLayer.id;
@@ -707,11 +681,16 @@ export function measureCharacters(configJson: string): string {
       changeLayerText(ch);
 
       var bounds = layer.bounds();
-      var charW = Math.ceil(bounds.width);
-      var charH = Math.ceil(bounds.height);
 
-      if (charW > maxW) maxW = charW;
-      if (charH > maxH) maxH = charH;
+      // 仅该轴参与统一的项才计入对应轴的最大尺寸（两轴可来自不同项）
+      if (isUnifyAxis(items[i].unifyWidth)) {
+        var charW = Math.ceil(bounds.width);
+        if (charW > maxW) maxW = charW;
+      }
+      if (isUnifyAxis(items[i].unifyHeight)) {
+        var charH = Math.ceil(bounds.height);
+        if (charH > maxH) maxH = charH;
+      }
 
       try { layer.remove(); } catch (e) { /* 忽略 */ }
     }
@@ -724,6 +703,57 @@ export function measureCharacters(configJson: string): string {
     try { app.displayDialogs = oldDialogs; } catch (e2) { /* 忽略 */ }
     return "__ERROR__:" + e;
   }
+}
+
+/**
+ * 读取宿主脚本版本号（用于确认 PS 是否加载了最新脚本）
+ */
+function getHostScriptVersion(): string {
+  try {
+    var g = $ as any;
+    if (g.HostScriptVersion) {
+      return g.HostScriptVersion;
+    }
+  } catch (e) {
+    // 忽略
+  }
+  return "unknown";
+}
+
+
+
+/**
+ * 判断某一轴是否参与统一画布
+ * unifyWidth / unifyHeight 缺省（undefined）视为参与统一，保证旧预设行为不变
+ */
+function isUnifyAxis(value: any): boolean {
+  return value !== false;
+}
+
+/**
+ * 确保工作文档画布尺寸等于目标尺寸
+ * resizeCanvas 使用 top-left 锚点，保证原点仍在 (0,0)；尺寸未变化时跳过，避免无谓的历史记录
+ */
+function ensureCanvasSize(
+  doc: any,
+  targetW: number,
+  targetH: number,
+  curW: number,
+  curH: number
+): void {
+  if (targetW <= 0 || targetH <= 0) {
+    return;
+  }
+  if (Math.ceil(curW) === Math.ceil(targetW) && Math.ceil(curH) === Math.ceil(targetH)) {
+    return;
+  }
+  resizeCanvasWithAnchor(
+    doc,
+    targetW,
+    targetH,
+    charIDToTypeID("Left"),
+    charIDToTypeID("Top ")
+  );
 }
 
 /**

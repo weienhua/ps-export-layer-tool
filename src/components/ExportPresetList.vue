@@ -37,6 +37,7 @@
           <div class="preview-line">前缀: {{ preset.prefix || '(空)' }}</div>
           <div class="preview-line">格式: {{ preset.format === 'jpg' ? 'JPG' : 'PNG' }} | 对齐: {{ anchorLabel(preset.anchor) }} | 延长: {{ preset.paddingW }}×{{ preset.paddingH }}</div>
           <div class="preview-line" v-if="(preset.paddingTop || preset.paddingRight || preset.paddingBottom || preset.paddingLeft)">对齐边距: 上{{ preset.paddingTop || 0 }} 右{{ preset.paddingRight || 0 }} 下{{ preset.paddingBottom || 0 }} 左{{ preset.paddingLeft || 0 }}</div>
+          <div class="preview-line" v-if="trimAxisText(preset)">分轴: {{ trimAxisText(preset) }}</div>
           <div class="preview-line preview-items">{{ preset.items.map(function(i) { return i.text; }).join('  ') }}</div>
         </div>
       </div>
@@ -61,6 +62,25 @@ const emit = defineEmits<{
 
 var dragId = ref<string | null>(null);
 var previewAlign = reactive<Record<string, string>>({});
+
+/**
+ * 预设的分轴勾选摘要（用于 hover 预览确认勾选已持久化）
+ * unifyWidth / unifyHeight 缺省视为「参与统一」，与宿主判定保持一致
+ * @returns 摘要文本，全部参与统一时返回空串
+ */
+function trimAxisText(preset: ExportPreset): string {
+  var countW = 0;
+  var countH = 0;
+  for (var i = 0; i < preset.items.length; i++) {
+    if (preset.items[i].unifyWidth === false) countW++;
+    if (preset.items[i].unifyHeight === false) countH++;
+  }
+  if (countW === 0 && countH === 0) return "";
+  var parts: string[] = [];
+  if (countW > 0) parts.push(countW + " 项裁剪宽");
+  if (countH > 0) parts.push(countH + " 项裁剪高");
+  return parts.join("，");
+}
 
 function onMouseEnter(e: MouseEvent, id: string) {
   var card = (e.target as HTMLElement).closest(".preset-item") as HTMLElement;

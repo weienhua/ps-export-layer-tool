@@ -61,17 +61,22 @@
           <div class="items-inline-actions">
             <span class="rows-label">行数</span>
             <input type="number" v-model="tableRows" min="2" max="30" class="rows-input" title="表格行数" />
-            <button class="btn-add-row" @click="items.push({text:'',name:''})">+ 添加行</button>
+            <button class="btn-add-row" @click="items.push({text:'',name:'',unifyWidth:true,unifyHeight:true})">+ 添加行</button>
           </div>
         </div>
         <div class="items-table-wrap" :style="{ maxHeight: tableRows * 32 + 'px' }">
           <table class="items-table" v-if="items.length > 0">
             <thead><tr>
-              <th class="col-idx">#</th><th class="col-txt">渲染内容</th><th class="col-nm">文件后缀</th><th class="col-act"></th>
+              <th class="col-idx">#</th>
+              <th class="col-trim" title="勾选=宽度参与统一画布；不勾选=按内容裁剪宽度（只保留设定边距）">宽</th>
+              <th class="col-trim" title="勾选=高度参与统一画布；不勾选=按内容裁剪高度（只保留设定边距）">高</th>
+              <th class="col-txt">渲染内容</th><th class="col-nm">文件后缀</th><th class="col-act"></th>
             </tr></thead>
             <tbody>
               <tr v-for="(item, idx) in items" :key="idx">
                 <td class="col-idx">{{ idx + 1 }}</td>
+                <td class="col-trim"><input type="checkbox" :checked="isUnifyW(item)" @change="setItemUnify(idx, 'width', ($event.target as HTMLInputElement).checked)" /></td>
+                <td class="col-trim"><input type="checkbox" :checked="isUnifyH(item)" @change="setItemUnify(idx, 'height', ($event.target as HTMLInputElement).checked)" /></td>
                 <td class="col-txt"><input type="text" :value="item.text" @input="setItemText(idx, ($event.target as HTMLInputElement).value)" placeholder="渲染文本" /></td>
                 <td class="col-nm"><input type="text" :value="item.name || ''" @input="setItemName(idx, ($event.target as HTMLInputElement).value)" :placeholder="sanitizePreview(item.text)" /></td>
                 <td class="col-act"><button class="btn-del-row" @click="items.splice(idx, 1)" title="删除">×</button></td>
@@ -80,6 +85,8 @@
           </table>
           <div class="items-empty-inline" v-else>暂无导出项，请选择预设或手动添加</div>
         </div>
+        <div class="filename-hint">「宽 / 高」勾选 = 该轴使用统一画布尺寸；不勾选 = 该轴按内容裁剪（内容尺寸 + 延长 + 对齐边距）</div>
+        <div class="filename-hint" v-if="trimmedCount > 0">{{ trimmedCount }} 项含按内容裁剪的轴，不参与该轴统一尺寸检测</div>
       </div>
 
       <div class="section-divider"></div>
@@ -96,15 +103,15 @@
         </div>
         <div class="canvas-size-row">
           <span class="cs-col-label">宽度</span>
-          <span class="cs-col-detect">{{ detectedMaxW > 0 ? detectedMaxW : '--' }} px</span>
+          <span class="cs-col-detect">{{ unifiedWCount > 0 ? unifiedMaxW : '--' }}</span>
           <span class="cs-col-pad"><input type="number" v-model="paddingW" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
-          <span class="cs-col-result">{{ detectedMaxW > 0 ? detectedMaxW + paddingW + alignPadLeft + alignPadRight : '--' }} px</span>
+          <span class="cs-col-result">{{ unifiedWCount > 0 ? unifiedMaxW + paddingW + alignPadLeft + alignPadRight + ' px' : '按内容裁剪' }}</span>
         </div>
         <div class="canvas-size-row">
           <span class="cs-col-label">高度</span>
-          <span class="cs-col-detect">{{ detectedMaxH > 0 ? detectedMaxH : '--' }} px</span>
+          <span class="cs-col-detect">{{ unifiedHCount > 0 ? unifiedMaxH : '--' }}</span>
           <span class="cs-col-pad"><input type="number" v-model="paddingH" min="0" class="cs-input" /><span class="cs-unit">px</span></span>
-          <span class="cs-col-result">{{ detectedMaxH > 0 ? detectedMaxH + paddingH + alignPadTop + alignPadBottom : '--' }} px</span>
+          <span class="cs-col-result">{{ unifiedHCount > 0 ? unifiedMaxH + paddingH + alignPadTop + alignPadBottom + ' px' : '按内容裁剪' }}</span>
         </div>
       </div>
       <div v-else class="canvas-size-table">
@@ -193,7 +200,8 @@
         <div v-if="exportResult && exportResult.success" class="result-detail">
           <div class="result-row"><span class="result-label">文件数</span><span class="result-value">{{ exportResult.data.total }}</span></div>
           <div class="result-row"><span class="result-label">最大尺寸</span><span class="result-value">{{ exportResult.data.maxWidth }} × {{ exportResult.data.maxHeight }} px</span></div>
-          <div class="result-row"><span class="result-label">最终画布</span><span class="result-value">{{ exportResult.data.maxWidth + (sizeMode === 'auto' ? paddingW + alignPadLeft + alignPadRight : 0) }} × {{ exportResult.data.maxHeight + (sizeMode === 'auto' ? paddingH + alignPadTop + alignPadBottom : 0) }} px</span></div>
+          <div class="result-row" v-if="exportResult.data.trimmedCount > 0 || exportResult.data.skippedCount > 0"><span class="result-label">裁剪 / 跳过</span><span class="result-value">{{ exportResult.data.trimmedCount || 0 }} 项含裁剪轴 / {{ exportResult.data.skippedCount || 0 }} 项跳过</span></div>
+          <div class="result-row" v-if="exportResult.data.skippedCount > 0 && exportResult.data.skipReason"><span class="result-label">跳过原因</span><span class="result-value result-error-msg">{{ exportResult.data.skipReason }}</span></div>
           <div class="result-row"><span class="result-label">输出目录</span><span class="result-value result-path">{{ exportResult.data.outputDir }}</span></div>
         </div>
         <div v-else-if="exportResult && !exportResult.success" class="result-detail">
@@ -286,7 +294,7 @@ const autoExportEnabled = ref(getSetting("autoExportEnabled", false));
 const previewEnabled = ref(getSetting("previewEnabled", true));
 const presetName = ref("");
 const tableRows = ref(getSetting("tableRows", 8));
-const exportResult = ref<{ success: boolean; data?: { total: number; maxWidth: number; maxHeight: number; outputDir: string }; error?: string } | null>(null);
+const exportResult = ref<{ success: boolean; data?: { total: number; maxWidth: number; maxHeight: number; trimmedCount?: number; skippedCount?: number; skipReason?: string; outputDir: string }; error?: string } | null>(null);
 const lastLayerId = ref(-1);
 const isNoDocument = ref(false);
 let detectTimer: ReturnType<typeof setInterval> | null = null;
@@ -298,6 +306,54 @@ const isMeasuring = ref(false);
 const suffix = computed(function () { return format.value === "png" ? ".png" : ".jpg"; });
 const safePrefix = computed(function () { return sanitizeFilename(prefix.value); });
 const canExport = computed(function () { return items.value.length > 0; });
+
+/** 该轴是否参与统一画布（unifyWidth / unifyHeight 缺省视为参与，保证旧预设行为不变） */
+function isUnifyW(item: ExportPresetItem): boolean {
+  return item.unifyWidth !== false;
+}
+function isUnifyH(item: ExportPresetItem): boolean {
+  return item.unifyHeight !== false;
+}
+/** 含按内容裁剪轴的项数（仅用于面板提示，实际裁剪由宿主计算） */
+const trimmedCount = computed(function () {
+  var count = 0;
+  for (var i = 0; i < items.value.length; i++) {
+    if (!isUnifyW(items.value[i]) || !isUnifyH(items.value[i])) count++;
+  }
+  return count;
+});
+/** 参与统一宽度的项数与本地估算的最大宽度 */
+const unifiedWCount = computed(function () {
+  var count = 0;
+  for (var i = 0; i < items.value.length; i++) {
+    if (isUnifyW(items.value[i])) count++;
+  }
+  return count;
+});
+const unifiedHCount = computed(function () {
+  var count = 0;
+  for (var i = 0; i < items.value.length; i++) {
+    if (isUnifyH(items.value[i])) count++;
+  }
+  return count;
+});
+/** 检测值优先取宿主结果；未检测时用本地字符宽度粗估 */
+const unifiedMaxW = computed(function () {
+  if (detectedMaxW.value > 0) return detectedMaxW.value;
+  if (unifiedWCount.value !== items.value.length) return 0;
+  var max = 0;
+  for (var i = 0; i < items.value.length; i++) {
+    var len = items.value[i].text.length;
+    if (len > max) max = len;
+  }
+  return Math.round(max * (fontInfo.value ? fontInfo.value.fontSize : 12) * 0.6);
+});
+const unifiedMaxH = computed(function () {
+  if (detectedMaxH.value > 0) return detectedMaxH.value;
+  if (unifiedHCount.value !== items.value.length) return 0;
+  if (items.value.length === 0) return 0;
+  return Math.round((fontInfo.value ? fontInfo.value.fontSize : 12) * 1.2);
+});
 
 function sanitizePreview(ch: string): string {
   if (ch === ":") return "-"; if (ch === "/" || ch === "\\" || ch === "*" || ch === "?" || ch === "\"" || ch === "<" || ch === ">" || ch === "|") return "_";
@@ -405,15 +461,30 @@ async function doExport(_info: any) {
   isExporting.value = true;
   if (items.value.length === 0) { isExporting.value = false; showToast("请先选择预设或添加导出项", true); return; }
   if (outputDir.value.trim() === "") { isExporting.value = false; showToast("请选择导出目录", true); return; }
-  if (sizeMode.value === "manual" && (exportWidth.value <= 0 || exportHeight.value <= 0)) {
-    isExporting.value = false; showToast("请输入有效的画布尺寸", true); return;
+  if (sizeMode.value === "manual") {
+    // 仅校验「有项参与统一」的轴：该轴无统一项时全部按内容裁剪，无需手动画布尺寸
+    if (unifiedWCount.value > 0 && exportWidth.value <= 0) {
+      isExporting.value = false; showToast("请输入有效的画布宽度", true); return;
+    }
+    if (unifiedHCount.value > 0 && exportHeight.value <= 0) {
+      isExporting.value = false; showToast("请输入有效的画布高度", true); return;
+    }
+  }
+  // 某一轴无任何项参与统一：该轴全部按内容裁剪，仅提示，不阻断导出
+  if (sizeMode.value === "auto" && unifiedWCount.value === 0) {
+    showToast("无项参与统一宽度，宽度将全部按内容裁剪", true);
+  }
+  if (sizeMode.value === "auto" && unifiedHCount.value === 0) {
+    showToast("无项参与统一高度，高度将全部按内容裁剪", true);
   }
   try {
     var result = await psBridge.batchExport(buildConfig(items.value));
     if (result.success && result.data) {
       detectedMaxW.value = result.data.maxWidth; detectedMaxH.value = result.data.maxHeight;
       exportResult.value = { success: true, data: result.data };
-      showToast("导出完成！共 " + result.data.total + " 个文件");
+      var msg = "导出完成！共 " + result.data.total + " 个文件";
+      if (result.data.skippedCount > 0) { msg += "（跳过 " + result.data.skippedCount + " 项空内容）"; }
+      showToast(msg);
     } else { exportResult.value = { success: false, error: result.error || "导出失败" }; showToast(result.error || "导出失败", true); }
   } catch (e) { exportResult.value = { success: false, error: String(e) }; showToast("导出失败: " + String(e), true); }
   finally { isExporting.value = false; }
@@ -443,10 +514,33 @@ function setItemName(idx: number, name: string) {
   newItems[idx] = { ...newItems[idx], name: name };
   items.value = newItems;
 }
+/** 切换某一轴是否参与统一画布（axis: "width" | "height"） */
+function setItemUnify(idx: number, axis: string, checked: boolean) {
+  var newItems = [...items.value];
+  var item = newItems[idx] as any;
+  if (axis === "width") {
+    newItems[idx] = { ...item, unifyWidth: checked };
+  } else {
+    newItems[idx] = { ...item, unifyHeight: checked };
+  }
+  items.value = newItems;
+  // 勾选变化会影响统一尺寸的统计口径，清空已检测值避免预览使用过期数据
+  detectedMaxW.value = 0;
+  detectedMaxH.value = 0;
+  // 注意：勾选只改当前表单，不自动写盘；用户点「保存为预设」时才持久化
+}
 
 // 填充表单（不含 auto-export，用于恢复预设）
 function fillFormFromPreset(preset: ExportPreset) {
-  items.value = [...preset.items];
+  // 深拷贝并补齐分轴字段：缺省视为参与统一（旧预设行为不变）
+  items.value = preset.items.map(function (item) {
+    return {
+      text: item.text,
+      name: item.name,
+      unifyWidth: item.unifyWidth !== false,
+      unifyHeight: item.unifyHeight !== false,
+    } as ExportPresetItem;
+  });
   activePresetId.value = preset.id;
   presetName.value = preset.name;
   prefix.value = preset.prefix || "";
@@ -486,6 +580,21 @@ function handleDeletePreset(id: string) {
   if (activePresetId.value === id) { activePresetId.value = null; }
 }
 
+/**
+ * 表单导出项 → 预设导出项：把分轴勾选落成显式 true/false（缺省视为勾选）
+ * 只有「保存为预设」时才会调用，勾选本身不写盘
+ */
+function toPresetItems(): ExportPresetItem[] {
+  return items.value.map(function (item) {
+    return {
+      text: item.text,
+      name: item.name,
+      unifyWidth: item.unifyWidth !== false,
+      unifyHeight: item.unifyHeight !== false,
+    } as ExportPresetItem;
+  });
+}
+
 function handleSavePreset() {
   if (items.value.length === 0) { showToast("请先添加导出项", true); return; }
   if (!presetName.value.trim()) { showToast("请输入预设名称", true); return; }
@@ -493,7 +602,7 @@ function handleSavePreset() {
   savePreset({
     id: "",
     name: name,
-    items: [...items.value], prefix: prefix.value, format: format.value,
+    items: toPresetItems(), prefix: prefix.value, format: format.value,
     anchor: anchor.value, paddingW: paddingW.value, paddingH: paddingH.value,
     paddingTop: alignPadTop.value, paddingRight: alignPadRight.value,
     paddingBottom: alignPadBottom.value, paddingLeft: alignPadLeft.value,
@@ -547,6 +656,9 @@ watch(alignPadTop, function (val) { setSetting("batchAlignPadT", val); });
 watch(alignPadRight, function (val) { setSetting("batchAlignPadR", val); });
 watch(alignPadBottom, function (val) { setSetting("batchAlignPadB", val); });
 watch(alignPadLeft, function (val) { setSetting("batchAlignPadL", val); });
+
+
+
 
 onUnmounted(function () { stopPolling(); });
 </script>
@@ -607,7 +719,9 @@ onUnmounted(function () { stopPolling(); });
 .items-table th { position: sticky; top: 0; background: var(--bg-secondary, #2a2a2a); color: var(--text-muted); font-weight: 500; padding: 4px 6px; border-bottom: 1px solid var(--border); z-index: 1; }
 .items-table td { padding: 2px 6px; border-bottom: 1px solid var(--border-hairline, #3a3a3a); }
 .col-idx { width: 28px; text-align: center; color: var(--text-muted); font-size: 10px; }
-.col-txt, .col-nm { width: 44%; }
+.col-trim { width: 26px; text-align: center; }
+.col-trim input[type="checkbox"] { margin: 0; vertical-align: middle; cursor: pointer; }
+.col-txt, .col-nm { width: 39%; }
 .col-act { width: 24px; text-align: center; }
 .items-table input { width: 100%; padding: 3px 4px; border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box; }
 .items-table input:hover { border-color: var(--border); }
@@ -634,6 +748,7 @@ onUnmounted(function () { stopPolling(); });
 .result-value { color: var(--text-main); }
 .result-path { word-break: break-all; font-size: 10px; font-family: Consolas, Monaco, monospace; }
 .result-error-msg { color: var(--error); font-size: 11px; }
+
 
 /* 预设区域 */
 .preset-section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }

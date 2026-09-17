@@ -42,7 +42,7 @@ export function duplicateSourceLayer(
   dupDesc.putInteger(stringIDToTypeID("version"), 5);
   executeAction(stringIDToTypeID("duplicate"), dupDesc, DialogModes.NO);
 
-  // 切回目标文档，获取复制后的图层
+  // 切回目标文档，获取复制后的图层（调用方可用 getLayerId 读取其 id）
   var targetDoc = app.documents.getByName(targetDocName);
   app.activeDocument = targetDoc;
   return Layer.getSelectedLayers()[0];
@@ -50,17 +50,37 @@ export function duplicateSourceLayer(
 
 /**
  * 文档内复制图层（按 ID 选中后复制），返回复制后的图层
+ * 复制完成后选中新图层（调用方可直接对 activeLayer 操作），并确保其可见（模板层已被隐藏）
  */
 export function duplicateLayer(layerId: number): any {
   // 选中图层
+  selectLayerById(layerId);
+
+  // 原地复制
+  duplicateActiveLayer();
+
+  // 确保复制出的图层是可见的（模板层已被隐藏）
+  var dupLayer = Layer.getSelectedLayers()[0];
+  dupLayer.show();
+  return dupLayer;
+}
+
+/**
+ * 选中指定 ID 的图层
+ */
+function selectLayerById(layerId: number): void {
   var selectDesc = new ActionDescriptor();
   var selectRef = new ActionReference();
   selectRef.putIdentifier(charIDToTypeID("Lyr "), layerId);
   selectDesc.putReference(charIDToTypeID("null"), selectRef);
   selectDesc.putBoolean(charIDToTypeID("MkVs"), false);
   executeAction(charIDToTypeID("slct"), selectDesc, DialogModes.NO);
+}
 
-  // 原地复制
+/**
+ * 原地复制当前选中的图层
+ */
+function duplicateActiveLayer(): void {
   var dupDesc = new ActionDescriptor();
   var dupRef = new ActionReference();
   dupRef.putEnumerated(
@@ -71,11 +91,65 @@ export function duplicateLayer(layerId: number): any {
   dupDesc.putReference(stringIDToTypeID("null"), dupRef);
   dupDesc.putInteger(stringIDToTypeID("version"), 5);
   executeAction(stringIDToTypeID("duplicate"), dupDesc, DialogModes.NO);
+}
 
-  // 确保复制出的图层是可见的（模板层已被隐藏）
-  var dupLayer = Layer.getSelectedLayers()[0];
-  dupLayer.show();
-  return dupLayer;
+/**
+ * 复制指定 ID 的图层，返回新图层 ID（复制后新图层为选中状态）
+ * 避免通过 putIdentifier 叠加引用推断 ID，直接读取文档 activeLayer.id
+ */
+export function duplicateLayerById(layerId: number): number {
+  selectLayerById(layerId);
+  duplicateActiveLayer();
+  return app.activeDocument.activeLayer.id;
+}
+
+/**
+ * 查询图层自身的 ID 属性（layer.id 是属性，不是方法）
+ */
+export function getLayerId(layer: any): number {
+  return layer.id;
+}
+
+/**
+ * 按 ID 读取当前文档中图层的 bounds（含图层效果，不改变选中状态）
+ * @param layerId 图层 ID
+ * @returns Rect { x, y, width, height }
+ */
+export function getBoundsById(layerId: number): any {
+  var ref = new ActionReference();
+  ref.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("bounds"));
+  ref.putIdentifier(charIDToTypeID("Lyr "), layerId);
+  var desc = executeActionGet(ref);
+  var rect = desc.getObjectValue(stringIDToTypeID("bounds"));
+  var left = rect.getUnitDoubleValue(charIDToTypeID("Left"));
+  var top = rect.getUnitDoubleValue(charIDToTypeID("Top "));
+  var right = rect.getUnitDoubleValue(charIDToTypeID("Rght"));
+  var bottom = rect.getUnitDoubleValue(charIDToTypeID("Btom"));
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+/**
+ * 按 ID 删除当前文档中的图层
+ * 与 ps-api Layer.remove() 使用同一 ActionManager 序列（targetEnum + layerID 列表），保证兼容性
+ */
+export function removeLayerById(layerId: number): void {
+  var desc = new ActionDescriptor();
+  var ref = new ActionReference();
+  ref.putEnumerated(
+    stringIDToTypeID("layer"),
+    stringIDToTypeID("ordinal"),
+    stringIDToTypeID("targetEnum")
+  );
+  desc.putReference(stringIDToTypeID("null"), ref);
+  var idList = new ActionList();
+  idList.putInteger(layerId);
+  desc.putList(stringIDToTypeID("layerID"), idList);
+  executeAction(stringIDToTypeID("delete"), desc, DialogModes.NO);
 }
 
 /**
@@ -195,6 +269,75 @@ export function calcAnchorOffsetY(
   } else {
     return canvasHeight - textBottom - padB;
   }
+}
+
+/**
+ * 对锚点偏移做边距钳制：把内容夹在 [padStart, canvasSize - boxSize - padEnd] 区间内
+ * 统一轴上画布尺寸由统一尺寸决定（存在松弛空间），锚点选择照常生效；
+ * 裁剪轴上画布尺寸 = ceil(内容) + 边距（松弛空间 = 两侧边距之和），锚点退化为钳制边界
+ *
+ * boxSize 取 Math.ceil(contentSize)，保证裁剪轴上内容落点仍为整数像素
+ * （否则 canvas = ceil(content) + 边距 会留下亚像素松弛，使留白左右不均）
+ * @param offset 期望偏移（来自 calcAnchorOffsetX/Y）
+ * @param contentSize 内容实际尺寸（bounds 的宽或高，可为小数）
+ * @param canvasSize 画布尺寸
+ * @param padStart 起始侧对齐边距（左 / 上）
+ * @param padEnd 结束侧对齐边距（右 / 下）
+ * @returns 钳制后的偏移量
+ */
+export function clampAnchorOffset(
+  offset: number,
+  contentSize: number,
+  canvasSize: number,
+  padStart: number,
+  padEnd: number
+): number {
+  var boxSize = contentSize;
+  if (Math.ceil(contentSize) >= canvasSize) {
+    // 裁剪轴上 canvas = ceil(content) + 边距：仅在内容尺寸正好为整数时取整余量为 0，
+    // 此时若按 content 计算会留下亚像素松弛，导致留白左右不均，故改用 ceil 作为盒尺寸
+    boxSize = Math.ceil(contentSize);
+  }
+  var maxOffset = canvasSize - boxSize - padEnd;
+  if (maxOffset < padStart) {
+    // box + 边距超出画布（内容尺寸正好为整数时的取整余量）：优先保证起始侧边距
+    return padStart;
+  }
+  var result = offset;
+  if (result < padStart) {
+    result = padStart;
+  }
+  if (result > maxOffset) {
+    result = maxOffset;
+  }
+  return result;
+}
+
+/**
+ * 计算某一轴的画布尺寸
+ * @param contentSize 内容实际尺寸（bounds 的宽或高）
+ * @param unifiedSize 该轴统一尺寸（统一轴传入；裁剪轴传 0）
+ * @param isUnified 该轴是否参与统一画布
+ * @param padding 画布延长边距（paddingW / paddingH）
+ * @param padStart 起始侧对齐边距（左 / 上）
+ * @param padEnd 结束侧对齐边距（右 / 下）
+ * @returns 画布尺寸；<= 0 表示该轴无尺寸（调用方应跳过该项）
+ */
+export function calcAxisCanvasSize(
+  contentSize: number,
+  unifiedSize: number,
+  isUnified: boolean,
+  padding: number,
+  padStart: number,
+  padEnd: number
+): number {
+  if (isUnified) {
+    if (unifiedSize > 0) {
+      return unifiedSize;
+    }
+    return 0;
+  }
+  return Math.ceil(contentSize) + padding + padStart + padEnd;
 }
 
 /**

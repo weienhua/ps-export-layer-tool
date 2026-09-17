@@ -27,7 +27,7 @@ npm run package            # 生产模式构建 + 打包发布文件（zip + 安
   - 入口: `src/main.ts` → `src/App.vue`
   - 组件: `src/components/*.vue`（`<script setup lang="ts">`），含 TabBar、BatchExportTab、LayersExportTab、FreeExportTab、ExportPresetList、SectionCollapsible、AnchorGrid 等
   - 组合式函数: `src/composables/useToast.ts`、`useExportPreset.ts`、`settings.ts`
-  - 共享类型: `src/types/index.ts`（AnchorType, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig(items代替characters), BatchExportResult, ExportPreset, ExportPresetItem）
+  - 共享类型: `src/types/index.ts`（AnchorType, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig(items代替characters), BatchExportResult, ExportPreset, ExportPresetItem〔text/name/unifyWidth/unifyHeight〕）
 - 宿主侧: `src/jsx/hostscript.ts` + `src/jsx/modules/` → webpack(ts-loader, target: ES3) → `dist/jsx/hostscript.js`
   - 入口: `src/jsx/hostscript.ts`（import + $.HostScript 注册）
   - 模块: `src/jsx/modules/`（utils、document、fileOps、batchExport、layersExport、freeExport、exportUtils）
@@ -65,6 +65,8 @@ $.HostScript = {
 };
 ```
 
+**宿主脚本版本戳**：`hostscript.ts` 的 `HOST_SCRIPT_VERSION` 同时挂到 `$.HostScriptVersion`，并由 `batchExport` 结果字段 `hostVersion` 回传（面板不展示，仅供调试核对）。**改动宿主逻辑后必须递增该版本号**，用于区分「代码 bug」与「PS 缓存了旧脚本」。
+
 ### ES3 兼容性
 
 - `target: ES3` + `extendscript-es5-shim`：语法降级由 TS 编译，ES5 API 由 shim 补充
@@ -96,6 +98,8 @@ $.HostScript = {
 - **overflow 检查用 if-else if**：避免 bounds 大于画布时 top/bottom（left/right）检查冲突
 - **测量用 Math.ceil**：`Math.ceil(bounds.width)` 确保画布尺寸不小于实际需要
 - **导出采用复制图层方案**：跨文档复制源图层 → 文档内每字符复制模板 + `textItem.contents` 改文字。所有文本属性、效果、不透明度通过复制自然继承，无需逐项 set
+- **复制出的图层必须可见**：模板层是隐藏的，PhotoShop 复制隐藏图层得到的副本**也是隐藏的**，而 `saveAs` 只渲染可见图层（否则导出纯透明空白图）。必须用 `duplicateLayer()`（内部已 `show()`），并在 `saveAs` 前加可见性兜底
+- **分轴统一/裁剪判定用 `!== false`**：`ExportPresetItem.unifyWidth`/`unifyHeight` 缺省（undefined）一律视为「参与统一」，保证旧预设行为不变。`maxW` 只统计 `unifyWidth !== false` 的项，`maxH` 只统计 `unifyHeight !== false` 的项（两轴最大值可来自不同项）；未勾选轴画布 = `Math.ceil(bounds) + paddingW/H + 该轴两侧对齐边距`
 
 ## 面板通信约定 (关键)
 
@@ -142,6 +146,9 @@ $.HostScript = {
 | 手动模式仍执行测量 | 手动模式（`sizeMode==="manual"`）已优化跳过 Phase 2 测量，直接进入导出阶段 |
 | 边距默认值 | 默认边距 `paddingW=10, paddingH=10`，保存在预设中 |
 | 预设文件被覆盖 | `load()` 不再回写 bundle 数据，预设仅来自文件 + localStorage |
+| 导出图纯透明/空白 | 复制隐藏模板层得到的副本也是隐藏的，`saveAs` 不渲染隐藏图层；须用 `duplicateLayer()` + saveAs 前可见性兜底 |
+| 结果与代码不符 | PS 缓存旧宿主脚本；重启 PS，或核对结果 JSON 里的 `hostVersion` 是否等于 `HOST_SCRIPT_VERSION` |
+| 分轴勾选未保存 | 设计如此：勾选只改当前表单，点「保存为预设」才落盘；旧预设缺字段一律按「勾选」处理 |
 
 ## 更多信息
 
