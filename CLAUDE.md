@@ -70,9 +70,12 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   ├── references/            # API 文档 + 示例脚本
 │   └── *.pdf                  # PS 脚本指南 PDF
 ├── scripts/
-│   ├── install.js             # 自动安装脚本
-│   ├── uninstall.js           # 卸载脚本
-│   ├── build-installer.js     # 打包脚本（zip + pkg 可执行文件）
+│   ├── install.js             # 自动安装脚本（Node；Windows exe 与开发环境共用）
+│   ├── uninstall.js           # 卸载脚本（Node）
+│   ├── templates/
+│   │   ├── install.sh.template # macOS 自解压安装脚本模板（__VERSION__ + __PAYLOAD_BELOW__）
+│   │   └── uninstall.sh        # macOS 卸载脚本模板（纯脚本，无载荷）
+│   ├── build-installer.js     # 打包脚本（zip + Windows pkg exe + macOS 自解压 shell）
 │   ├── verify-export-alignment.js # 导出像素校验（零依赖 PNG 解码，输出画布尺寸/内容包围盒/四周留白）
 │   └── release.js             # 发布脚本
 ├── tsconfig.json              # 面板侧：target ES6，jsx: preserve，排除 src/jsx/
@@ -102,11 +105,22 @@ npm run verify:export      # 导出像素校验（对目录/PNG 输出画布尺�
 `npm run package` 生成：
 - `com.ps.export.layer.tool-vX.X.X.zip` — 跨平台手动安装包
 - `com.ps.export.layer.tool-installer.exe` — Windows 自动安装程序
-- `com.ps.export.layer.tool-installer-macos` — macOS 自动安装程序
 - `com.ps.export.layer.tool-uninstaller.exe` — Windows 卸载程序
-- `com.ps.export.layer.tool-uninstaller-macos` — macOS 卸载程序
+- `com.ps.export.layer.tool-installer.sh` / `.command` — macOS 自动安装脚本（自解压）
+- `com.ps.export.layer.tool-uninstaller.sh` / `.command` — macOS 卸载脚本
 
-`pkg` 支持交叉编译，可在 macOS 上同时生成 Windows 和 macOS 安装程序。
+**Windows**：`pkg` 打包成独立 `.exe`，支持交叉编译（macOS/Linux 上也能生成）。
+
+**macOS**：自解压 shell 脚本 —— bash 头部 + `__PAYLOAD_BELOW__` 标记行 + base64(tar.gz) 插件数据，
+运行时 `awk` 定位标记 → `tail | base64 -d | tar xzf` 解到临时目录。`.command` 供 Finder 双击（打开终端执行），
+`.sh` 供终端运行（无需执行权限）。不使用 `pkg`：已停止维护、无 arm64 目标、未签名产物会被 Gatekeeper 拦截。
+模板在 `scripts/templates/`（`install.sh.template` / `uninstall.sh`），需在 macOS 上打包。
+
+**安装逻辑等价性（重要）**：macOS shell 脚本与 `scripts/install.js` 的 macOS 分支行为一致 ——
+复制 `CSXS/`+`dist/`+`doc/`、保留用户预设 `dist/lib/presets/`、卸载备份目录
+`${EXTENSION_ID}_user_files/presets/` 跨平台互通、符号链接只删链接、开启 CSXS 6-12 调试模式。
+与参考项目 `ps-layer-tool` 的关键差异：**不**在"用户原先无预设"时删除安装包内置的
+`dist/lib/presets/default.json`（22 个内置预设）——面板首次加载内置预设依赖该文件。
 
 ## 架构：两个隔离的执行上下文
 

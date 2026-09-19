@@ -21,7 +21,7 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 - **面板 UI**：Vue 3 SFC + TypeScript，暗色主题，可折叠卡片
 - **调试面板**：内置通信日志查看器（实时显示 send/receive/error + 耗时）
 - **Toast 提示**：操作反馈动画提示
-- **自动化脚本**：安装/卸载/打包/发布（`pkg` 生成独立可执行文件）
+- **自动化脚本**：安装/卸载/打包/发布（Windows 用 `pkg` 生成 exe；macOS 用自解压 `.sh` / `.command`）
 - **跨平台**：支持 Windows/macOS，兼容 PS 2019 (v20.0) 及以上
 
 ## 技术栈
@@ -77,9 +77,11 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   └── *.pdf                     # PS 脚本指南 PDF
 ├── dist/                         # 构建产物
 ├── scripts/
-│   ├── install.js                # 自动安装脚本
-│   ├── uninstall.js              # 卸载脚本
-│   ├── build-installer.js        # 打包脚本
+│   ├── install.js                # 自动安装脚本（Node；Windows exe 与开发环境共用）
+│   ├── uninstall.js              # 卸载脚本（Node）
+│   ├── build-installer.js        # 打包脚本（zip + Windows exe + macOS 自解压 shell）
+│   ├── templates/                # macOS 脚本模板（install.sh.template / uninstall.sh）
+│   ├── verify-export-alignment.js # 导出像素校验（画布尺寸 / 内容包围盒 / 四周留白）
 │   └── release.js                # 发布脚本
 ├── webpack.config.js             # 面板 webpack 配置
 ├── webpack.config.jsx.js         # 宿主脚本 webpack 配置
@@ -93,24 +95,23 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 下载安装程序，运行即可自动完成安装：
 
 - **Windows**: 下载 `com.ps.export.layer.tool-installer.exe`，双击运行
-- **macOS**: 下载 `com.ps.export.layer.tool-installer-macos`，右键选择"打开"或使用终端运行：
-  ```bash
-  chmod +x com.ps.export.layer.tool-installer-macos
-  ./com.ps.export.layer.tool-installer-macos
-  ```
+- **macOS**（二选一）：
+  - 双击 `com.ps.export.layer.tool-installer.command`（Finder 双击，自动打开终端运行）
+  - 终端运行 `bash com.ps.export.layer.tool-installer.sh`（无需执行权限）
 
 安装程序会自动：
 1. 检测已安装的 Photoshop 版本
-2. 复制插件文件到 CEP 扩展目录
-3. 开启调试模式
+2. 复制插件文件（`CSXS/`、`dist/`、`doc/`）到 CEP 扩展目录
+3. 保留用户自定义预设（`dist/lib/presets/`）
+4. 开启调试模式（CSXS 6-12）
+
+> 提示：macOS 下载的脚本若被 Gatekeeper 拦截（提示"无法验证开发者"），可右键 → 打开运行一次，或先执行 `xattr -d com.apple.quarantine <文件名>` 清除隔离标记后重试。
 
 **卸载方法**：
 - **Windows**: 双击运行 `com.ps.export.layer.tool-uninstaller.exe`
-- **macOS**: 右键选择"打开"或使用终端运行：
-  ```bash
-  chmod +x com.ps.export.layer.tool-uninstaller-macos
-  ./com.ps.export.layer.tool-uninstaller-macos
-  ```
+- **macOS**: 双击 `com.ps.export.layer.tool-uninstaller.command`，或终端 `bash com.ps.export.layer.tool-uninstaller.sh`
+
+卸载时会把用户预设备份到 `com.ps.export.layer.tool_user_files/`，下次安装自动恢复。
 
 ### 方式二：手动安装
 
@@ -212,6 +213,7 @@ defaults write com.adobe.CSXS.11 PlayerDebugMode 1   # PS 2022+
 | 面板白屏 | HTML/JS 加载失败 | 检查浏览器控制台错误信息 |
 | 宿主脚本不生效 | PS 缓存旧脚本 | 重启 Photoshop 或重新加载扩展 |
 | 修改代码后不更新 | 未重新构建 | 运行 `npm run build` 后重启 PS |
+| macOS 安装脚本双击无反应 / 提示"无法验证开发者" | 下载的脚本带 quarantine 隔离标记，且可能丢失执行位 | 右键 → 打开运行一次，或 `xattr -d com.apple.quarantine <文件名>`；也可终端 `bash com.ps.export.layer.tool-installer.sh`（不依赖执行位） |
 
 ## 发布新版本
 
@@ -226,9 +228,9 @@ npm run release 1.2.3   # 直接指定版本号
 
 命令会自动：
 1. 更新 `package.json` 版本号
-2. 构建项目并生成安装包（zip + exe）
+2. 构建项目并生成安装包（zip + Windows exe + macOS 自解压脚本）
 3. 提交代码并创建 git tag
-4. 推送到 GitHub
+4. 推送到 GitHub（触发 GitHub Actions 发布）
 
 ## 开发
 
@@ -244,6 +246,7 @@ npm run dev:panel          # 仅面板 watch
 npm run dev:jsx            # 仅宿主 watch
 npm run clean              # 清理 dist 和 installer
 npm run package            # 生产模式构建 + 打包发布文件（zip + 安装程序）到 installer/
+npm run verify:export      # 导出像素校验（画布尺寸 / 内容包围盒 / 四周留白）
 ```
 
 ### 打包说明
@@ -254,11 +257,15 @@ npm run package            # 生产模式构建 + 打包发布文件（zip + 安
 |------|------|------|
 | `com.ps.export.layer.tool-vX.X.X.zip` | 手动安装包 | 跨平台 |
 | `com.ps.export.layer.tool-installer.exe` | Windows 自动安装程序 | Windows |
-| `com.ps.export.layer.tool-installer-macos` | macOS 自动安装程序 | macOS |
 | `com.ps.export.layer.tool-uninstaller.exe` | Windows 卸载程序 | Windows |
-| `com.ps.export.layer.tool-uninstaller-macos` | macOS 卸载程序 | macOS |
+| `com.ps.export.layer.tool-installer.sh` / `.command` | macOS 自动安装脚本（自解压） | macOS |
+| `com.ps.export.layer.tool-uninstaller.sh` / `.command` | macOS 卸载脚本 | macOS |
 
-**跨平台打包**：`pkg` 支持交叉编译，可在 macOS 上同时生成 Windows 和 macOS 安装程序。
+**打包方式**：
+- **Windows**：`pkg` 打包成独立 `.exe`，支持交叉编译（在 macOS/Linux 上也能生成）
+- **macOS**：自解压 shell 脚本（bash 头部 + `__PAYLOAD_BELOW__` 标记 + base64 插件数据），`.command` 供 Finder 双击、`.sh` 供终端运行；不使用 `pkg`（已停止维护、无 arm64 目标、未签名产物会被 Gatekeeper 拦截），需在 macOS 上打包
+
+两者生成的插件内容与 `.zip` 完全一致（`CSXS/` + `dist/` + `doc/`），均会保留用户自定义预设 `dist/lib/presets/`。
 
 ### 添加新功能
 
