@@ -41,7 +41,33 @@ export interface ExportPreset {
   paddingBottom?: number;
   /** 对齐边距：左（left 锚点时生效） */
   paddingLeft?: number;
+  /**
+   * 水平基准（缺省 = ink 墨迹）
+   * - layout：按字宽（排印框）定位 → 等字宽素材的共有字形同 x，内容按字宽居中
+   * - ink：按各项可见墨迹定位 → 每张内容居中，共有字形 x 会随墨迹宽变化
+   */
+  alignModeX?: AlignMode;
+  /**
+   * 垂直基准（缺省 = layout 排印框）
+   * - layout：整组共用同一常量位移 → 基线一致（墨迹高矮不一的项会显得偏心）
+   * - ink：各项可见墨迹居中 → 高矮不一则基线错开
+   */
+  alignModeY?: AlignMode;
+  /** 兼容旧数据（单开关时期）：仅读取，落盘写 alignModeX / alignModeY */
+  alignMode?: AlignMode;
 }
+
+/**
+ * 对齐基准（004），按轴选择
+ * - layout：排印框
+ *   水平 → 用字宽(advance)与可见墨迹的**较宽者**定位：等字宽素材（「周一…周日」）共有字形同 x
+ *   垂直 → 用整组墨迹框（众数框）做**整组常量位移** + 并集画布：各项基线一致、绝不裁切
+ * - ink：墨迹 —— 按每项实际像素包围盒定位：每张内容各自居中（水平居中 / 垂直居中）
+ *
+ * 缺省（新预设）：水平 ink + 垂直 layout（即「混合」，每张内容横向居中 + 基线一致）。
+ * 统一画布下「每张内容居中」与「共有字形同 x」不可兼得，只能按轴取舍。
+ */
+export type AlignMode = "layout" | "ink";
 
 /**
  * 9 点锚位类型（Position Anchor）
@@ -129,6 +155,12 @@ export interface BatchExportConfig {
   paddingBottom?: number;
   /** 对齐边距：左 */
   paddingLeft?: number;
+  /** 水平基准（缺省 = ink 墨迹） */
+  alignModeX?: AlignMode;
+  /** 垂直基准（缺省 = layout 排印框） */
+  alignModeY?: AlignMode;
+  /** 兼容旧数据（单开关时期）：仅读取 */
+  alignMode?: AlignMode;
 }
 
 /**
@@ -150,6 +182,12 @@ export interface BatchExportResult {
   skipReason?: string;
   /** 宿主脚本版本号（确认 PS 是否加载最新脚本） */
   hostVersion?: string;
+  /** 实际生效的水平基准（layout = 排印框，ink = 墨迹） */
+  alignModeX?: AlignMode;
+  /** 实际生效的垂直基准 */
+  alignModeY?: AlignMode;
+  /** 请求排印框但被迫退回墨迹对齐的原因（诊断用，如 x:paragraph-text / x:multiline） */
+  alignFallback?: string;
   outputDir: string;
 }
 

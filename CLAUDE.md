@@ -77,6 +77,7 @@ Photoshop CEP 面板插件，用于快速导出 PS 文档中的图层资源。�
 │   │   └── uninstall.sh        # macOS 卸载脚本模板（纯脚本，无载荷）
 │   ├── build-installer.js     # 打包脚本（zip + Windows pkg exe + macOS 自解压 shell）
 │   ├── verify-export-alignment.js # 导出像素校验（零依赖 PNG 解码，输出画布尺寸/内容包围盒/四周留白）
+│   ├── verify-text-alignment.js   # 对齐基准回归环（驱动 PS 跑四组合，比较共有字形落点/内容居中）
 │   └── release.js             # 发布脚本
 ├── tsconfig.json              # 面板侧：target ES6，jsx: preserve，排除 src/jsx/
 ├── tsconfig.jsx.json          # 宿主侧：target ES3，types: [ps-extendscript-types]
@@ -98,6 +99,7 @@ npm run dev:jsx            # 仅宿主 webpack watch（开发模式）
 npm run clean              # rimraf dist installer
 npm run package            # 生产模式构建 + 打包发布文件（zip + 安装程序）到 installer/
 npm run verify:export      # 导出像素校验（对目录/PNG 输出画布尺寸 + 内容包围盒 + 四周留白）
+npm run verify:text-alignment  # 对齐基准回归环（--run 跑默认组合、--run --matrix 跑四组合、也可直接分析导出目录）
 ```
 
 ### 打包产物
@@ -311,6 +313,16 @@ src/jsx/
 
 **宿主脚本版本戳**：`hostscript.ts` 里 `var HOST_SCRIPT_VERSION = "..."` 同时挂到 `$.HostScriptVersion`，并由 `batchExport` 结果字段 `hostVersion` 回传（面板结果卡片不展示，仅供调试/日志核对）。改动宿主逻辑后**必须同步递增该版本号**，用于区分「代码 bug」与「PS 缓存了旧脚本」。
 
+**对齐基准与定位的关键规则（004）**：
+- **按轴选择**：`alignModeX`（水平）/ `alignModeY`（垂直），取值 `layout`（排印框）/ `ink`（墨迹）；缺省 = `ink` / `layout`（混合）。旧字段 `alignMode` 仅读兼容 → 两轴继承
+- **水平 layout**：参考宽 = `max(字宽之和, 墨迹宽)`；字宽探测（追加末字符取差）只在「该轴启用 layout + 锚点需要宽度（居中/右侧）」时执行，**水平 ink 时完全跳过**（更快）
+- **垂直 layout**：整组共用同一常量位移（参考框 = 组内众数墨迹框，无众数退回并集框），画布高 = 参与项墨迹**并集**高 + 边距 ⇒ 各项基线一致且绝不裁切；垂直 ink 时逐项墨迹居中
+- **多行 / 段落文本**：只让**水平**退回墨迹（字宽差值法跨行失真；垂直的墨迹框依然有效），结果字段 `alignFallback` 记录原因
+- **未勾选（裁剪）轴**：四种组合下都走原逻辑（`ceil(墨迹) + 延长 + 对齐边距`，贴边），003 逐像素不变
+- **`clampAnchorOffset` 只用于防溢出**：统一轴仅在画布装不下内容时才钳制 —— 居中偏移**可以为负**（内容自然位置已在理想位置右侧时），按「偏移」钳制会把内容钉在左边（实测偏右 8~16px）；裁剪轴沿用原样
+- **`duplicateLayer` 取副本用 DOM `activeLayer`**，不用 `Layer.getSelectedLayers()`：连续复制时它的 `targetLayersIDs` 会滞后、返回上一个图层
+- **`removeLayerById` 必须先按 ID 选中再删**：PS 的 delete 是「目标图层」语义，会忽略 `layerID` 列表；未选中目标时会把当前选中的图层删掉
+
 ```typescript
 // 在对应模块文件中定义并导出函数（如 modules/document.ts）
 export function getDocumentInfo(): string {
@@ -372,7 +384,7 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 **分轴统一 / 按内容裁剪（`ExportPresetItem.unifyWidth` / `unifyHeight`）**：
 每个导出项有「宽」「高」两个独立勾选，两轴可自由组合（全统一 / 只统一宽 / 只统一高 / 全裁剪）：
 - **勾选轴（统一）**：画布尺寸取该轴统一值（auto = 该轴参与统一项的最大内容尺寸 + 边距；manual = 用户输入值），
-  再走原 `calcAnchorOffsetX/Y` + 溢出钳制（`clampAnchorOffset`）定位，行为与引入分轴前逐像素一致
+  再走 `calcAnchorOffsetX/Y` 定位；`clampAnchorOffset` **仅在画布装不下内容时**兜底（居中偏移可为负，见下「对齐基准」）
 - **未勾选轴（裁剪）**：画布尺寸 = `Math.ceil(bounds轴尺寸) + paddingW/H + 该轴两侧对齐边距`，无多余透明像素
 - 两轴的最大值可来自不同项：`maxW` 只统计 `unifyWidth !== false` 的项，`maxH` 只统计 `unifyHeight !== false` 的项
 - 某轴无任何项参与统一时该轴画布返回 `0`，该项按内容裁剪；`measureCharacters` 同样分轴统计，保证检测值与导出结果一致
@@ -385,11 +397,25 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 - 兼容旧数据：`unifyWidth`/`unifyHeight` 缺失一律视为「勾选」。三处兜底 —— 加载时 `normalize()` 补 `true`、应用到表单时 `fillFormFromPreset()` 用 `!== false` 判定、宿主 `isUnifyAxis()` 用 `!== false` 判定
 - 因此内置预设与旧预设文件（`default.json` 里没有这两个字段）无需迁移，行为与分轴功能引入前完全一致
 
+**对齐基准（按轴，004）**：
+面板「对齐」下方有两个分段开关：**水平基准**、**垂直基准**（两组按钮顺序统一为「排印框｜墨迹」）。缺省 = 水平 `ink` + 垂直 `layout`（混合）。
+
+| 轴 | `排印框`（layout） | `墨迹`（ink） |
+|---|---|---|
+| 水平 | 按字宽定位：参考宽 = `max(字宽之和, 墨迹宽)` → **等字宽素材的共有字形同 x**（「周一…周日」的 `周`）；内容按字宽居中 | 按各项可见墨迹定位 → **每张内容都居中**，但共有字形 x 会随墨迹宽变化 |
+| 垂直 | 整组共用同一常量位移（参考框 = 组内众数墨迹框）→ **各项基线一致**；墨迹高矮不一的项会显得偏心 | 逐项墨迹居中 → 墨迹高矮不一时**基线会错开** |
+
+- **物理限制**：统一画布下「每张可见内容居中」与「共有字形同 x」**不可兼得**（两者同时成立要求逐张画布宽 = `2×共有字形左边距 + 该项墨迹宽`）。要同时做到 → **取消勾选该轴的「宽」**（按内容裁剪）+ 左右对齐边距相等
+- **推荐用法**：共享字形的素材（周X / 星期X / 日期-中文）横向可用排印框；单项或字宽各异的素材（数字 / 天干 / 生肖 / 英文周）横向用墨迹最正；纵向要「同一行」就用排印框
+- **持久化**：预设字段 `alignModeX` / `alignModeY`；表单设置 localStorage `batchAlignModeX` / `batchAlignModeY`（旧键 `batchAlignMode` 已不再读取）
+- **旧数据兼容**（`useExportPreset.normalize()`）：无 `alignModeX/Y` 且无旧 `alignMode` → 混合默认；只有旧 `alignMode` → 两轴继承；随后删掉旧字段、只写分轴字段
+
 **预设系统**：
 - 预设卡片列表（底部），支持拖拽排序、hover 预览、自动导出开关
-- 预设存储完整配置（items〔含 unifyWidth/unifyHeight〕 + prefix + format + anchor + paddingW/H + paddingTop/Right/Bottom/Left）
+- 预设存储完整配置（items〔含 unifyWidth/unifyHeight〕 + prefix + format + anchor + alignModeX/alignModeY + paddingW/H + paddingTop/Right/Bottom/Left）
 - 数据存储：`dist/lib/presets/default.json` + localStorage `exportLayerTool.presets.v1`
 - 面板设置统一存储：`exportLayerTool.settings.v1`
+- ⚠️ **该 json 同时是「内置预设种子」（`src/lib/presets/default.json`，构建时由 CopyPlugin 复制到 `dist/lib/presets/`）与「面板保存预设的落盘文件」**：`npm run build` / `npm run package` 会用种子**覆盖**面板保存的内容（安装/升级路径不受影响：`scripts/install.js`/`uninstall.js` 与 macOS 自解压脚本都整目录保留并备份恢复 `dist/lib/presets/`）。要彻底分开可把面板写盘目标改为 `dist/lib/presets/user.json`，读取顺序改为 `user.json → default.json → localStorage`（**未实施**）
 
 **子组件**：
 - **ExportPresetList**：预设卡片列表（拖拽排序 + hover 预览 + 预览开关；预览含「分轴: N 项裁剪宽，M 项裁剪高」摘要）
@@ -447,7 +473,7 @@ vendored 自 [photoshop-script-api](https://github.com/emptykid/photoshop-script
 | 文件 | 作用域 | 内容 |
 |------|--------|------|
 | `src/types/cep-panel.d.ts` | 面板侧 | `CSInterface` 类、`HostEnvironment`、`CSEvent` |
-| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息）、`BatchExportConfig`（导出配置）、`BatchExportResult`（导出结果，含 `unifiedWCount`/`unifiedHCount`/`trimmedCount`/`skippedCount`/`skipReason`/`hostVersion`）、`ExportPreset`、`ExportPresetItem`（`text`/`name`/`unifyWidth`/`unifyHeight`）、`LayerInfo`、`BatchExportLayersConfig`、`BatchExportLayersResult`、`FreeExportLayerInfo`、`FreeExportConfig`、`FreeExportResult` |
+| `src/types/index.ts` | 面板侧 + 共享 | `AnchorType`（9 点锚位）、`AlignMode`（`layout` 排印框 / `ink` 墨迹，按轴取值）、`ExportFormat`（png/jpg）、`SizeMode`（auto/manual）、`TextLayerInfo`（字体信息）、`BatchExportConfig`（导出配置，含 `alignModeX`/`alignModeY`）、`BatchExportResult`（导出结果，含 `unifiedWCount`/`unifiedHCount`/`trimmedCount`/`skippedCount`/`skipReason`/`hostVersion`/`alignModeX`/`alignModeY`/`alignFallback`）、`ExportPreset`（含 `alignModeX`/`alignModeY`；旧 `alignMode` 仅读兼容）、`ExportPresetItem`（`text`/`name`/`unifyWidth`/`unifyHeight`）、`LayerInfo`、`BatchExportLayersConfig`、`BatchExportLayersResult`、`FreeExportLayerInfo`、`FreeExportConfig`、`FreeExportResult` |
 | `src/jsx/modules/types.d.ts` | 宿主脚本侧 | ActionManager 全局 API（`executeActionGet`、`stringIDToTypeID` 等） |
 | `ps-extendscript-types`（npm） | 宿主脚本侧 | PS ExtendScript DOM（`app`、`Document`、`ArtLayer` 等） |
 
@@ -539,6 +565,10 @@ Set-ItemProperty -Path "HKCU:\Software\Adobe\CSXS.12" -Name "PlayerDebugMode" -V
 | 导出结果为纯透明/空白图 | 复制隐藏的模板层得到的副本**也是隐藏的**，而 `saveAs` 只渲染可见图层 | 用 `duplicateLayer()`（内部已 `show()`），并在 `saveAs` 前加可见性兜底：`if (!app.activeDocument.activeLayer.visible) visible = true` |
 | 结果与代码不符（改动不生效） | PS 缓存了旧宿主脚本，`dist/jsx/hostscript.js` 未重新加载 | 重启 PS；需要核对时看 `batchExport` 结果里的 `hostVersion` 是否等于 `hostscript.ts` 的 `HOST_SCRIPT_VERSION` |
 | 分轴勾选没被保存 | 勾选只改当前表单，**设计上不会自动写盘** | 点「保存为预设」才会持久化；旧预设没有 `unifyWidth`/`unifyHeight` 字段时一律按「勾选」处理 |
+| 同一批素材里共有字形（如「周」）落点不一致 | 水平基准 = 墨迹时每张各自居中，共有字形 x 必然随墨迹宽变化 | 把**水平基准**切成「排印框」（等字宽素材共有字形同 x）；默认的混合已经是「横墨迹·竖排印框」 |
+| 同一批素材基线不齐（高矮不一的项错行） | 垂直基准 = 墨迹时各项墨迹各自居中 | 把**垂直基准**切成「排印框」（整组常量位移，基线一致） |
+| 数字/句点等字形偏右、贴边 | ① 可见墨迹比字宽宽（图层效果 / 负字距）时，排印框按窄盒居中 → 已改为参考宽 `max(字宽, 墨迹宽)`；② `clampAnchorOffset` 把**负的居中偏移**钳到 0、内容钉在左边 → 已改为「统一轴仅在画布装不下内容时才钳制」 | 已修复（真实素材实测：月 11/3→7/7、日 23/5→13/15） |
+| 面板保存的预设被构建覆盖 | `npm run build` / `npm run package` 会用 `src/lib/presets/default.json`（种子）覆盖 `dist/lib/presets/`，而面板保存写的也是同一文件 | 安装/升级路径安全（安装器整目录保留并备份恢复）；开发构建会覆盖，可改为 `user.json` 分离（未实施，见「对齐基准」节的说明） |
 
 ## 会话交接约定
 

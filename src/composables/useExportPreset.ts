@@ -6,7 +6,7 @@
  */
 
 import { ref } from "vue";
-import type { ExportPreset } from "../types";
+import type { ExportPreset, AlignMode } from "../types";
 import { psBridge } from "../bridge";
 
 const STORAGE_KEY = "exportLayerTool.presets.v1";
@@ -65,6 +65,14 @@ export function useExportPreset() {
       if (p.paddingRight === undefined) p.paddingRight = 0;
       if (p.paddingBottom === undefined) p.paddingBottom = 0;
       if (p.paddingLeft === undefined) p.paddingLeft = 0;
+      // 对齐基准（按轴，004）：缺省 = 混合（水平 ink 每张内容居中 / 垂直 layout 基线一致）
+      // 旧数据只有 alignMode 时两轴继承它；随后清掉旧字段，落盘只写分轴字段
+      var legacyMode: AlignMode | "" = p.alignMode === "ink" || p.alignMode === "layout" ? p.alignMode : "";
+      var axisDefaultX: AlignMode = legacyMode === "" ? "ink" : legacyMode;
+      var axisDefaultY: AlignMode = legacyMode === "" ? "layout" : legacyMode;
+      if (p.alignModeX !== "ink" && p.alignModeX !== "layout") p.alignModeX = axisDefaultX;
+      if (p.alignModeY !== "ink" && p.alignModeY !== "layout") p.alignModeY = axisDefaultY;
+      if (p.alignMode !== undefined) delete p.alignMode;
       // 分轴统一字段补齐为 true：旧预设/内置预设行为不变，落盘结构明确
       var items = p.items;
       if (items) {

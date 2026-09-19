@@ -124,14 +124,35 @@
       </div>
 
       <div class="canvas-bottom-row">
-        <div class="anchor-wrap">
-          <span class="anchor-label">对齐</span>
-          <AnchorGrid v-model="anchor" />
+        <div class="align-controls">
+          <div class="anchor-wrap">
+            <span class="anchor-label">对齐</span>
+            <AnchorGrid v-model="anchor" />
+          </div>
         </div>
         <button v-if="sizeMode === 'auto'" class="btn btn-sm" @click="detectSize" :disabled="!fontInfo || isMeasuring">
           {{ isMeasuring ? '检测中...' : '检测尺寸' }}
         </button>
       </div>
+
+      <!-- 对齐基准（按轴）：水平管横向居中方式，垂直管纵向定位方式；两组按钮顺序统一为「排印框｜墨迹」 -->
+      <div class="align-mode-row">
+        <div class="anchor-wrap">
+          <span class="anchor-label">水平基准</span>
+          <div class="align-mode-switch">
+            <button :class="['align-mode-btn', { active: alignModeX === 'layout' }]" @click="alignModeX = 'layout'">排印框</button>
+            <button :class="['align-mode-btn', { active: alignModeX === 'ink' }]" @click="alignModeX = 'ink'">墨迹</button>
+          </div>
+        </div>
+        <div class="anchor-wrap">
+          <span class="anchor-label">垂直基准</span>
+          <div class="align-mode-switch">
+            <button :class="['align-mode-btn', { active: alignModeY === 'layout' }]" @click="alignModeY = 'layout'">排印框</button>
+            <button :class="['align-mode-btn', { active: alignModeY === 'ink' }]" @click="alignModeY = 'ink'">墨迹</button>
+          </div>
+        </div>
+      </div>
+      <div class="filename-hint">排印框 = 按字宽/行框定位（共有字形对齐、各项基线一致）；墨迹 = 按可见像素定位（每张内容各自居中）</div>
 
       <!-- 对齐边距 -->
       <div class="canvas-size-table align-pad-table">
@@ -266,7 +287,7 @@ import { useExportPreset } from "../composables/useExportPreset";
 import { getSetting, setSetting, outputDir } from "../composables/settings";
 import { sanitizeFilename } from "../composables/filenameUtils";
 import type { AnchorType, ExportFormat, SizeMode, TextLayerInfo, ExportPreset } from "../types";
-import type { BatchExportConfig, ExportPresetItem } from "../types";
+import type { BatchExportConfig, ExportPresetItem, AlignMode } from "../types";
 
 const showToast = inject<(msg: string, isError?: boolean) => void>("showToast", function () {});
 
@@ -288,6 +309,16 @@ const alignPadRight = ref(getSetting("batchAlignPadR", 0));
 const alignPadBottom = ref(getSetting("batchAlignPadB", 0));
 const alignPadLeft = ref(getSetting("batchAlignPadL", 0));
 const anchor = ref<AnchorType>("middle-center");
+// 对齐基准（按轴）：水平缺省「墨迹」（每张内容居中），垂直缺省「排印框」（基线一致）
+// 注：不继承旧的单开关设置 batchAlignMode —— 那是旧语义（只有一个轴），
+//     新默认（混合）直接生效；已保存的预设另见 fillFormFromPreset 的兼容逻辑
+function readAxisAlignSetting(key: string, axisDefault: AlignMode): AlignMode {
+  var v = getSetting(key, "");
+  if (v === "ink" || v === "layout") return v;
+  return axisDefault;
+}
+const alignModeX = ref<AlignMode>(readAxisAlignSetting("batchAlignModeX", "ink"));
+const alignModeY = ref<AlignMode>(readAxisAlignSetting("batchAlignModeY", "layout"));
 const isExporting = ref(false);
 var fontWarning = reactive({ visible: false, label: "", onConfirm: () => {} });
 const autoExportEnabled = ref(getSetting("autoExportEnabled", false));
@@ -346,7 +377,9 @@ const unifiedMaxW = computed(function () {
     var len = items.value[i].text.length;
     if (len > max) max = len;
   }
-  return Math.round(max * (fontInfo.value ? fontInfo.value.fontSize : 12) * 0.6);
+  // 水平排印框下按字宽估算（CJK 方框字 ≈ 1 字宽/字）；水平墨迹沿用 0.6 粗估
+  var factor = alignModeX.value === "ink" ? 0.6 : 1.0;
+  return Math.round(max * (fontInfo.value ? fontInfo.value.fontSize : 12) * factor);
 });
 const unifiedMaxH = computed(function () {
   if (detectedMaxH.value > 0) return detectedMaxH.value;
@@ -431,6 +464,7 @@ function buildConfig(theItems: ExportPresetItem[]): BatchExportConfig {
     paddingBottom: alignPadBottom.value,
     paddingLeft: alignPadLeft.value,
     anchor: anchor.value, outputDir: outputDir.value,
+    alignModeX: alignModeX.value, alignModeY: alignModeY.value,
     fontName: info ? info.fontName : "", fontStyle: info ? info.fontStyle : "",
     fontScriptName: info ? info.fontScriptName : "", fontSize: info ? info.fontSize : 12,
     colorHex: info ? info.color : "#000000", syntheticBold: info ? info.syntheticBold : false,
@@ -546,6 +580,15 @@ function fillFormFromPreset(preset: ExportPreset) {
   prefix.value = preset.prefix || "";
   format.value = preset.format || "png";
   anchor.value = preset.anchor || "middle-center";
+  // 分轴基准：新字段优先；只有旧 alignMode 时两轴继承；都没有则用混合缺省（横墨迹·竖排印框）
+  var legacyMode = preset.alignMode;
+  var legacyValid = legacyMode === "ink" || legacyMode === "layout";
+  alignModeX.value = preset.alignModeX === "ink" || preset.alignModeX === "layout"
+    ? preset.alignModeX
+    : (legacyValid ? legacyMode : "ink");
+  alignModeY.value = preset.alignModeY === "ink" || preset.alignModeY === "layout"
+    ? preset.alignModeY
+    : (legacyValid ? legacyMode : "layout");
   paddingW.value = preset.paddingW !== undefined ? preset.paddingW : 10;
   paddingH.value = preset.paddingH !== undefined ? preset.paddingH : 10;
   alignPadTop.value = preset.paddingTop !== undefined ? preset.paddingTop : 0;
@@ -604,6 +647,7 @@ function handleSavePreset() {
     name: name,
     items: toPresetItems(), prefix: prefix.value, format: format.value,
     anchor: anchor.value, paddingW: paddingW.value, paddingH: paddingH.value,
+    alignModeX: alignModeX.value, alignModeY: alignModeY.value,
     paddingTop: alignPadTop.value, paddingRight: alignPadRight.value,
     paddingBottom: alignPadBottom.value, paddingLeft: alignPadLeft.value,
   });
@@ -656,6 +700,8 @@ watch(alignPadTop, function (val) { setSetting("batchAlignPadT", val); });
 watch(alignPadRight, function (val) { setSetting("batchAlignPadR", val); });
 watch(alignPadBottom, function (val) { setSetting("batchAlignPadB", val); });
 watch(alignPadLeft, function (val) { setSetting("batchAlignPadL", val); });
+watch(alignModeX, function (val) { setSetting("batchAlignModeX", val); });
+watch(alignModeY, function (val) { setSetting("batchAlignModeY", val); });
 
 
 
@@ -695,6 +741,15 @@ onUnmounted(function () { stopPolling(); });
 .cs-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(58,141,255,0.25); }
 .cs-unit { color: var(--text-muted); font-size: 10px; margin-left: 4px; }
 .canvas-bottom-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.align-controls { display: flex; align-items: center; }
+.align-controls > * + * { margin-left: 12px; }
+.align-mode-row { display: flex; align-items: center; margin-top: 8px; }
+.align-mode-row > * + * { margin-left: 16px; }
+.align-mode-switch { display: flex; }
+.align-mode-switch > * + * { margin-left: 4px; }
+.align-mode-btn { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text-muted); font-size: 11px; cursor: pointer; transition: all 0.15s ease; }
+.align-mode-btn:hover { color: var(--text-secondary); }
+.align-mode-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .anchor-wrap { display: flex; align-items: center; }
 .anchor-label { font-size: 11px; color: var(--text-secondary); margin-right: 8px; }
 .cs-col-result { color: var(--primary); font-weight: 600; text-align: right; flex: 1; }

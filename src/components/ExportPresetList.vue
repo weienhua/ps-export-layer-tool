@@ -35,7 +35,7 @@
         </div>
         <div :class="['preset-preview', previewAlign[preset.id] || 'center']">
           <div class="preview-line">前缀: {{ preset.prefix || '(空)' }}</div>
-          <div class="preview-line">格式: {{ preset.format === 'jpg' ? 'JPG' : 'PNG' }} | 对齐: {{ anchorLabel(preset.anchor) }} | 延长: {{ preset.paddingW }}×{{ preset.paddingH }}</div>
+          <div class="preview-line">格式: {{ preset.format === 'jpg' ? 'JPG' : 'PNG' }} | 对齐: {{ anchorLabel(preset.anchor) }} | 基准: {{ alignModeLabel(preset) }} | 延长: {{ preset.paddingW }}×{{ preset.paddingH }}</div>
           <div class="preview-line" v-if="(preset.paddingTop || preset.paddingRight || preset.paddingBottom || preset.paddingLeft)">对齐边距: 上{{ preset.paddingTop || 0 }} 右{{ preset.paddingRight || 0 }} 下{{ preset.paddingBottom || 0 }} 左{{ preset.paddingLeft || 0 }}</div>
           <div class="preview-line" v-if="trimAxisText(preset)">分轴: {{ trimAxisText(preset) }}</div>
           <div class="preview-line preview-items">{{ preset.items.map(function(i) { return i.text; }).join('  ') }}</div>
@@ -134,6 +134,20 @@ function anchorLabel(a: string): string {
     "bottom-left": "↙", "bottom-center": "↓", "bottom-right": "↘",
   };
   return map[a] || a;
+}
+
+/**
+ * 基准摘要：两轴一致显示单个名字，混合显示「横X·竖Y」
+ * 兼容旧数据：只有 alignMode 时两轴继承它；都没有则按缺省混合（横墨迹·竖排印框）
+ */
+function alignModeLabel(preset: ExportPreset): string {
+  var legacy = preset.alignMode === "ink" || preset.alignMode === "layout" ? preset.alignMode : "";
+  var x = preset.alignModeX === "ink" || preset.alignModeX === "layout" ? preset.alignModeX : (legacy !== "" ? legacy : "ink");
+  var y = preset.alignModeY === "ink" || preset.alignModeY === "layout" ? preset.alignModeY : (legacy !== "" ? legacy : "layout");
+  var xName = x === "ink" ? "墨迹" : "排印框";
+  var yName = y === "ink" ? "墨迹" : "排印框";
+  if (xName === yName) return xName;
+  return "横" + xName + "·竖" + yName;
 }
 
 </script>

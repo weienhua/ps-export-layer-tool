@@ -121,6 +121,98 @@ function decodePng(filePath) {
     return false;
   }
 
+  /**
+   * 读取某像素的 alpha 值（无 alpha 通道的 PNG 视为全不透明 255）
+   */
+  function alphaAt(x, y) {
+    const idx = y * stride + x * channels;
+    if (colorType === 6) return pixels[idx + 3];
+    if (colorType === 4) return pixels[idx + 1];
+    return 255;
+  }
+
+  /**
+   * 按阈值统计包围盒（threshold=0 等价于 bbox()）
+   */
+  function bboxWithThreshold(threshold) {
+    let minX = width;
+    let minY = height;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (alphaAt(x, y) > threshold) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    return {
+      left: minX,
+      top: minY,
+      right: maxX,
+      bottom: maxY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+    };
+  }
+
+  /**
+   * 用「全空列」把图像切成若干横向段，每段各自求包围盒
+   * 用于把「周」和后面的字分开，单独比较共有字形在每张图里的落点
+   */
+  function segments(threshold) {
+    const occupied = [];
+    for (let x = 0; x < width; x++) {
+      let hit = false;
+      for (let y = 0; y < height; y++) {
+        if (alphaAt(x, y) > threshold) { hit = true; break; }
+      }
+      occupied.push(hit);
+    }
+    const result = [];
+    let start = -1;
+    for (let x = 0; x <= width; x++) {
+      const hit = x < width ? occupied[x] : false;
+      if (hit && start < 0) start = x;
+      if (!hit && start >= 0) {
+        const box = bboxOfRange(start, x - 1, threshold);
+        if (box) result.push(box);
+        start = -1;
+      }
+    }
+    return result;
+  }
+
+  function bboxOfRange(x0, x1, threshold) {
+    let minX = x1 + 1;
+    let minY = height;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (alphaAt(x, y) > threshold) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    return {
+      left: minX,
+      top: minY,
+      right: maxX,
+      bottom: maxY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+    };
+  }
+
   function bbox() {
     let minX = width;
     let minY = height;
@@ -151,7 +243,7 @@ function decodePng(filePath) {
     };
   }
 
-  return { width, height, bbox };
+  return { width, height, bbox, alphaAt, bboxWithThreshold, segments };
 }
 
 function collectFiles(targets) {
@@ -251,4 +343,9 @@ function main() {
   console.log("\n共解析 " + parsed + " 个 PNG");
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+// 供 scripts/verify-text-alignment.js 复用（零依赖 PNG 解码 + 分段分析）
+module.exports = { decodePng, collectFiles, padRight };

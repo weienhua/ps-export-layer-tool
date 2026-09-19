@@ -53,16 +53,19 @@ export function duplicateSourceLayer(
  * 复制完成后选中新图层（调用方可直接对 activeLayer 操作），并确保其可见（模板层已被隐藏）
  */
 export function duplicateLayer(layerId: number): any {
-  // 选中图层
-  selectLayerById(layerId);
-
-  // 原地复制
-  duplicateActiveLayer();
-
-  // 确保复制出的图层是可见的（模板层已被隐藏）
-  var dupLayer = Layer.getSelectedLayers()[0];
+  // 复制并按 ID 取回副本（走 duplicateLayerById：用 DOM activeLayer 解析复制出的图层，
+  // 不用 Layer.getSelectedLayers()——其 targetLayersIDs 在连续复制时可能滞后而返回上一个图层，
+  // 那样后面的 changeLayerText / 按 ID 删除就会作用到别的图层上，004 实测踩过）
+  var dupLayer = new Layer(duplicateLayerById(layerId));
   dupLayer.show();
   return dupLayer;
+}
+
+/**
+ * 读取当前活动图层 ID（DOM activeLayer；id 是属性不是方法）
+ */
+function getActiveLayerId(): number {
+  return (app.activeDocument.activeLayer as any).id;
 }
 
 /**
@@ -135,9 +138,13 @@ export function getBoundsById(layerId: number): any {
 
 /**
  * 按 ID 删除当前文档中的图层
- * 与 ps-api Layer.remove() 使用同一 ActionManager 序列（targetEnum + layerID 列表），保证兼容性
+ *
+ * 重要：PS 的 delete 是「目标图层」语义 —— null 引用为 targetEnum 时会忽略 layerID 列表，
+ * 实际删掉的是当前选中的图层（004 实测：未选中目标时会把别的图层删掉）。
+ * 因此这里先按 ID 选中再删，既保证删的是指定图层，也不依赖调用方的选中状态。
  */
 export function removeLayerById(layerId: number): void {
+  selectLayerById(layerId);
   var desc = new ActionDescriptor();
   var ref = new ActionReference();
   ref.putEnumerated(
@@ -338,6 +345,83 @@ export function calcAxisCanvasSize(
     return 0;
   }
   return Math.ceil(contentSize) + padding + padStart + padEnd;
+}
+
+/**
+ * 由「追加末字符」两次测量的墨迹右边界求该串的排版字宽之和（advance 之和）
+ *
+ * 原理：同一文字原点下把串的末字符再追加一次，多的那个字形整体右移了一个字宽，
+ *      于是 inkRight(文本 + 末字符) − inkRight(末字符) = Σ字宽(文本)。
+ * 用途：排印框对齐（004）——等字宽的「周一…周日」得到同一个参考宽，居中后共有字形落点才一致。
+ *
+ * @param inkRightWithSuffix 追加末字符后的墨迹右边界（bounds.x + bounds.width）
+ * @param inkRightSuffix 单独渲染末字符的墨迹右边界（同一文字原点）
+ * @returns 字宽之和；<= 0 视为无效，调用方应回退墨迹宽
+ */
+export function calcAdvanceWidth(inkRightWithSuffix: number, inkRightSuffix: number): number {
+  var advance = inkRightWithSuffix - inkRightSuffix;
+  if (!(advance > 0)) {
+    return 0;
+  }
+  return advance;
+}
+
+/**
+ * 从一组墨迹框里挑「众数框」作为整组纵向定位的参考（004 排印框对齐）
+ *
+ * 同一字体/字号下多数素材的墨迹框一致（如「周X」各项上下沿都由「周」决定），
+ * 用出现次数最多的框作整组常量位移的参考，比并集框更贴近单张观感，且不依赖「谁是第一项」。
+ * 量化：top / height 四舍五入到整数后比较（吸收亚像素差）。
+ * 规则：取出现次数最多的框；并列时取框高最小的；全部只出现一次（无众数）时返回 null（调用方退回并集框）。
+ *
+ * @param boxes 每项的墨迹框 { y, height }
+ * @returns { top, height }（该组第一个框的精确值）或 null
+ */
+export function pickModeInkFrame(boxes: any[]): any {
+  var keys: string[] = [];
+  var counts: number[] = [];
+  var firsts: any[] = [];
+  var i: number;
+  var j: number;
+
+  for (i = 0; i < boxes.length; i++) {
+    var box = boxes[i];
+    if (!box || !(box.height > 0)) {
+      continue;
+    }
+    var key = Math.round(box.y) + ":" + Math.round(box.height);
+    var found = -1;
+    for (j = 0; j < keys.length; j++) {
+      if (keys[j] === key) {
+        found = j;
+        break;
+      }
+    }
+    if (found < 0) {
+      keys.push(key);
+      counts.push(1);
+      firsts.push(box);
+    } else {
+      counts[found] = counts[found] + 1;
+    }
+  }
+
+  var best = -1;
+  var bestCount = 0;
+  for (i = 0; i < counts.length; i++) {
+    if (counts[i] > bestCount) {
+      bestCount = counts[i];
+      best = i;
+    } else if (counts[i] === bestCount && best >= 0 && firsts[i].height < firsts[best].height) {
+      // 并列：取框高最小的（更贴近实际内容，不偏向高框）
+      best = i;
+    }
+  }
+
+  if (best < 0 || bestCount < 2) {
+    return null;
+  }
+  return { top: firsts[best].y, height: firsts[best].height };
 }
 
 /**

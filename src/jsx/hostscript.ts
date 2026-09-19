@@ -14,7 +14,7 @@ import { selectFolderDialog, readFile, writeFile, getExtensionPath, ensureDirect
 // 宿主脚本版本号：面板「导出结果」会显示，用于确认 PS 加载的是否为最新脚本
 // ⚠️ 修改宿主逻辑后必须同步递增，否则无法区分「代码 bug」与「PS 缓存了旧脚本」
 // @ts-ignore
-var HOST_SCRIPT_VERSION = "2026.09.16-分轴统一裁剪-1";
+var HOST_SCRIPT_VERSION = "2026.09.19-分轴基准-1";
 // @ts-ignore
 $ = $ || {};
 // @ts-ignore

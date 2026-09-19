@@ -18,6 +18,7 @@ npm run dev:jsx            # 仅宿主 watch 模式
 npm run clean              # rimraf dist installer
 npm run package            # 生产模式构建 + 打包发布文件（zip + 安装程序）到 installer/
 npm run verify:export      # 导出像素校验（画布尺寸 / 内容包围盒 / 四周留白）
+npm run verify:text-alignment  # 对齐基准回归环（--run / --run --matrix 四组合 / 直接分析导出目录）
 ```
 
 ## 项目架构
@@ -28,7 +29,7 @@ npm run verify:export      # 导出像素校验（画布尺寸 / 内容包围盒
   - 入口: `src/main.ts` → `src/App.vue`
   - 组件: `src/components/*.vue`（`<script setup lang="ts">`），含 TabBar、BatchExportTab、LayersExportTab、FreeExportTab、ExportPresetList、SectionCollapsible、AnchorGrid 等
   - 组合式函数: `src/composables/useToast.ts`、`useExportPreset.ts`、`settings.ts`
-  - 共享类型: `src/types/index.ts`（AnchorType, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig(items代替characters), BatchExportResult, ExportPreset, ExportPresetItem〔text/name/unifyWidth/unifyHeight〕）
+  - 共享类型: `src/types/index.ts`（AnchorType, AlignMode, ExportFormat, SizeMode, TextLayerInfo, BatchExportConfig(items代替characters, 含 alignModeX/alignModeY), BatchExportResult(含 alignModeX/alignModeY/alignFallback), ExportPreset(含 alignModeX/alignModeY), ExportPresetItem〔text/name/unifyWidth/unifyHeight〕）
 - 宿主侧: `src/jsx/hostscript.ts` + `src/jsx/modules/` → webpack(ts-loader, target: ES3) → `dist/jsx/hostscript.js`
   - 入口: `src/jsx/hostscript.ts`（import + $.HostScript 注册）
   - 模块: `src/jsx/modules/`（utils、document、fileOps、batchExport、layersExport、freeExport、exportUtils）
@@ -101,6 +102,10 @@ $.HostScript = {
 - **导出采用复制图层方案**：跨文档复制源图层 → 文档内每字符复制模板 + `textItem.contents` 改文字。所有文本属性、效果、不透明度通过复制自然继承，无需逐项 set
 - **复制出的图层必须可见**：模板层是隐藏的，PhotoShop 复制隐藏图层得到的副本**也是隐藏的**，而 `saveAs` 只渲染可见图层（否则导出纯透明空白图）。必须用 `duplicateLayer()`（内部已 `show()`），并在 `saveAs` 前加可见性兜底
 - **分轴统一/裁剪判定用 `!== false`**：`ExportPresetItem.unifyWidth`/`unifyHeight` 缺省（undefined）一律视为「参与统一」，保证旧预设行为不变。`maxW` 只统计 `unifyWidth !== false` 的项，`maxH` 只统计 `unifyHeight !== false` 的项（两轴最大值可来自不同项）；未勾选轴画布 = `Math.ceil(bounds) + paddingW/H + 该轴两侧对齐边距`
+- **对齐基准按轴（`alignModeX` 水平 / `alignModeY` 垂直）**：`layout`（排印框）/ `ink`（墨迹），缺省 = `ink` / `layout`（混合）。水平 layout 参考宽 = `max(字宽之和, 墨迹宽)`，字宽探测只在「该轴 layout + 锚点需要宽度」时做（水平 ink 时跳过）；垂直 layout 用**整组常量位移**（组内众数墨迹框）+ 并集画布高 → 基线一致且不裁切；**多行/段落文本只让水平退回墨迹**（`alignFallback` 记录原因），垂直不受影响
+- **`clampAnchorOffset` 只用于防溢出**：统一轴**仅当画布装不下内容时**才钳制 —— 居中偏移可为负（内容自然位置已在理想位置右侧时），按「偏移」钳制会把内容钉在左边（实测偏右 8~16px）；裁剪轴沿用原样（003 不变）
+- **`duplicateLayer` 用 DOM `activeLayer` 解析副本**：不要用 `Layer.getSelectedLayers()`（连续复制时 `targetLayersIDs` 滞后，会返回上一个图层）
+- **`removeLayerById` 先按 ID 选中再删**：PS 的 delete 是「目标图层」语义、忽略 `layerID` 列表；未选中目标时会删掉当前选中的图层
 
 ## 面板通信约定 (关键)
 
@@ -150,6 +155,10 @@ $.HostScript = {
 | 导出图纯透明/空白 | 复制隐藏模板层得到的副本也是隐藏的，`saveAs` 不渲染隐藏图层；须用 `duplicateLayer()` + saveAs 前可见性兜底 |
 | 结果与代码不符 | PS 缓存旧宿主脚本；重启 PS，或核对结果 JSON 里的 `hostVersion` 是否等于 `HOST_SCRIPT_VERSION` |
 | 分轴勾选未保存 | 设计如此：勾选只改当前表单，点「保存为预设」才落盘；旧预设缺字段一律按「勾选」处理 |
+| 共有字形（如「周」）落点不一致 | 水平基准 = 墨迹时每张各自居中，共有字形 x 会随墨迹宽变化；要共有字形同 x → 水平基准选「排印框」 |
+| 基线不齐（高矮不一的项错行） | 垂直基准 = 墨迹时各项墨迹各自居中；要同一行 → 垂直基准选「排印框」（整组常量位移） |
+| 字形偏右/贴边（数字、句点等） | `clampAnchorOffset` 把负的居中偏移钳到 0（已修为「统一轴仅在画布装不下内容时才钳制」）；可见墨迹比字宽宽时参考宽取 `max(字宽, 墨迹宽)` |
+| 面板保存的预设被构建覆盖 | `npm run build`/`package` 用 `src/lib/presets/default.json`（种子）覆盖 `dist/lib/presets/`，面板保存写的也是该文件（安装/升级路径安全：安装器整目录保留并备份恢复） |
 
 ## 更多信息
 

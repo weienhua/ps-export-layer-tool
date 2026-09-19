@@ -7,7 +7,7 @@
 
 import { Document, Layer } from "../ps-api/src/index";
 import { ensureDirectory } from "./fileOps";
-import { duplicateSourceLayer, duplicateLayer, resizeCanvasWithAnchor, translateLayerBy, calcAnchorOffsetX, calcAnchorOffsetY, clampAnchorOffset, calcAxisCanvasSize, sanitizeFilenameChar } from "./exportUtils";
+import { removeLayerById, duplicateSourceLayer, duplicateLayer, resizeCanvasWithAnchor, translateLayerBy, calcAnchorOffsetX, calcAnchorOffsetY, clampAnchorOffset, calcAxisCanvasSize, calcAdvanceWidth, pickModeInkFrame, sanitizeFilenameChar } from "./exportUtils";
 
 function componentToHex(c: number): string {
   var hex = c.toString(16).toUpperCase();
@@ -369,6 +369,17 @@ export function batchExport(configJson: string): string {
     var anchor = config.anchor;
     var outputDir = config.outputDir;
 
+    // ===== 对齐基准（按轴，004） =====
+    // 水平基准：缺省 ink（每张内容横向居中）；显式 "layout" 才按字宽（等字宽素材共有字形同 x）
+    // 垂直基准：缺省 layout（整组基线一致）；显式 "ink" 才逐项墨迹居中
+    // 兼容旧数据：只有 alignMode 时两轴都继承它
+    var alignModeX = config.alignModeX;
+    var alignModeY = config.alignModeY;
+    if (alignModeX == null) { alignModeX = config.alignMode; }
+    if (alignModeY == null) { alignModeY = config.alignMode; }
+    var layoutXRequested = alignModeX === "layout";
+    var layoutYRequested = alignModeY !== "ink";
+
     // 确保输出目录存在
     var dirResult = ensureDirectory(outputDir);
     if (dirResult !== "__OK__") {
@@ -395,44 +406,54 @@ export function batchExport(configJson: string): string {
     // 隐藏模板层，防止原始文字残留到导出图中
     templateLayer.hide();
 
-    var maxW = 0;
-    var maxH = 0;
+    // 模板层是否为点文本：段落文本有固定文本框，字宽差值法会失真 → 水平轴退回墨迹（垂直轴不受影响）
+    var templateIsPointText = true;
+    if (layoutXRequested) {
+      templateIsPointText = isPointTextLayer(templateLayer);
+    }
+
+    // ==================== Phase 2: 逐项测量 ====================
+    // 任一侧需要排印框（或在自动尺寸下）都要测量；水平 ink 时可跳过字宽探测
+    var needAdvance = layoutXRequested && anchorNeedsWidthReference(anchor);
+    var layoutXPre = layoutXRequested && templateIsPointText;
+    var measured = emptyMeasurement();
+    if (sizeMode === "auto" || layoutXRequested || layoutYRequested) {
+      measured = measureItemSet(
+        templateLayer.id,
+        items,
+        layoutXPre,
+        layoutYRequested,
+        needAdvance
+      );
+    }
 
     // 统一画布尺寸（仅统计该轴参与统一的项，两轴可以来自不同项）
-    var unifiedWCount = 0;
-    var unifiedHCount = 0;
+    var maxW = measured.maxW;
+    var maxH = measured.maxH;
+    var unifiedWCount = measured.unifiedWCount;
+    var unifiedHCount = measured.unifiedHCount;
+    var advWidths = measured.advWidths;
 
-    // ==================== Phase 2: 逐字符测量（仅自动模式） ====================
-    if (sizeMode === "auto") {
-      for (var i = 0; i < items.length; i++) {
-        var itemText = items[i].text;
+    // 水平排印框是否真正生效（段落文本 / 多行文本会退回墨迹，并记录原因）；垂直轴恒可用
+    var layoutXEffective = layoutXPre && measured.advanceUsable;
+    var layoutYEffective = layoutYRequested;
+    var alignFallback = "";
+    if (layoutXRequested && !layoutXEffective) {
+      if (!templateIsPointText) {
+        alignFallback = "x:paragraph-text";
+      } else {
+        alignFallback = "x:" + measured.advanceReason;
+      }
+    }
 
-        // 复制模板层 → 改文字（属性/效果/不透明度全保留）
-        var layer = duplicateLayer(templateLayer.id);
-        changeLayerText(itemText);
-
-        var bounds = layer.bounds();
-
-        if (isUnifyAxis(items[i].unifyWidth)) {
-          var charW = Math.ceil(bounds.width);
-          if (charW > maxW) {
-            maxW = charW;
-          }
-          unifiedWCount++;
-        }
-        if (isUnifyAxis(items[i].unifyHeight)) {
-          var charH = Math.ceil(bounds.height);
-          if (charH > maxH) {
-            maxH = charH;
-          }
-          unifiedHCount++;
-        }
-
-        try {
-          layer.remove();
-        } catch (eRemove) {
-          // 删除失败不阻断流程
-        }
+    // 纵向参考框：组内众数墨迹框，无众数（各项都不同）时退回并集框
+    var layoutRefTop = measured.unionTop;
+    var layoutRefH = measured.unionH;
+    if (layoutYEffective && unifiedHCount > 0) {
+      var modeFrame = pickModeInkFrame(pickUnifiedHeightBoxes(items, measured.boxes));
+      if (modeFrame) {
+        layoutRefTop = modeFrame.top;
+        layoutRefH = modeFrame.height;
       }
     }
 
@@ -478,6 +499,10 @@ export function batchExport(configJson: string): string {
     // 画布尺寸跟踪：初始化时的 workDocSize 已是实际画布尺寸，后续按需 resize
     var canvasW = workDocSize;
     var canvasH = workDocSize;
+
+    // 排印框模式：整组共用的纵向位移（首个统一高项时计算一次）
+    var layoutYOffset = 0;
+    var layoutYReady = false;
 
     for (var j = 0; j < items.length; j++) {
       var expItem = items[j];
@@ -531,39 +556,58 @@ export function batchExport(configJson: string): string {
       canvasW = itemCanvasW;
       canvasH = itemCanvasH;
 
-      // 计算偏移（传入对齐边距）
-      var translateX = calcAnchorOffsetX(
-        anchor,
-        exportBounds.x,
-        exportBounds.width,
-        itemCanvasW,
-        padL,
-        padR
-      );
-      var translateY = calcAnchorOffsetY(
-        anchor,
-        exportBounds.y,
-        exportBounds.height,
-        itemCanvasH,
-        padT,
-        padB
-      );
+      // ===== 定位参考（按轴选） =====
+      // 水平 layout：参考宽取「排印框 ∪ 墨迹框」的最大值
+      //   墨迹 ≤ 排印宽（普通字形）：用排印宽 → 等字宽素材的共有字形落点一致（004）
+      //   墨迹 > 排印宽（图层效果 / 溢出笔画，如带描边的数字、句点）：用墨迹宽 → 可见内容仍居中；
+      //     否则会按比可见内容更窄的排印盒居中，把内容整体推偏（004 实测：数字偏右且贴边）
+      // 水平 ink：逐项墨迹框居中（每张内容横向居中）
+      // 垂直 layout：整组常量位移（基线一致）；垂直 ink：逐项墨迹框居中
+      // 未勾选（裁剪）轴：两种情况下都保持现状（003）
+      var itemIsLayoutW = layoutXEffective && itemUnifyW;
+      var itemIsLayoutH = layoutYEffective && itemUnifyH;
 
-      // 钳制到边距区间：统一轴保留锚点自由度，裁剪轴退化为贴边（内容 + 边距刚好占满画布）
-      translateX = clampAnchorOffset(
-        translateX,
-        exportBounds.width,
-        itemCanvasW,
-        padL,
-        padR
-      );
-      translateY = clampAnchorOffset(
-        translateY,
-        exportBounds.height,
-        itemCanvasH,
-        padT,
-        padB
-      );
+      var refW = exportBounds.width;
+      if (itemIsLayoutW && advWidths[j] > 0) {
+        refW = advWidths[j];
+        if (exportBounds.width > refW) {
+          refW = exportBounds.width;
+        }
+      }
+      var clampBoxW = refW;
+      if (exportBounds.width > clampBoxW) {
+        clampBoxW = exportBounds.width;
+      }
+
+      var translateX = calcAnchorOffsetX(anchor, exportBounds.x, refW, itemCanvasW, padL, padR);
+      // 统一轴：画布已按内容/字宽定过尺寸（自动）或用户指定（手动）。
+      // 居中偏移**可以为负**（内容自然位置就在理想位置右侧，例如左空边较大的「月/日」），
+      // 此时按「偏移」钳制会把内容钉在左边 —— 004 实测：会偏右 8~16px。
+      // 所以只有画布真的装不下内容时才钳制兜底；裁剪轴沿用原样（003 逐像素不变）。
+      if (!itemUnifyW || itemCanvasW < clampBoxW) {
+        translateX = clampAnchorOffset(translateX, clampBoxW, itemCanvasW, padL, padR);
+      }
+
+      var translateY: number;
+      if (itemIsLayoutH) {
+        // 整组共用同一常量：只在首个统一高项上算一次（纵向钳制同样只算这一次）
+        if (!layoutYReady) {
+          var rawLayoutY = calcAnchorOffsetY(anchor, layoutRefTop, layoutRefH, itemCanvasH, padT, padB);
+          // 同理：只有画布装不下整组内容时才钳制（否则常量位移会被推偏，破坏基线一致）
+          if (itemCanvasH < measured.unionH) {
+            rawLayoutY = clampAnchorOffset(rawLayoutY, measured.unionH, itemCanvasH, padT, padB);
+          }
+          layoutYOffset = rawLayoutY;
+          layoutYReady = true;
+        }
+        translateY = layoutYOffset;
+      } else {
+        translateY = calcAnchorOffsetY(anchor, exportBounds.y, exportBounds.height, itemCanvasH, padT, padB);
+        // 同 X：裁剪轴原样钳制（003），统一轴仅在装不下时兜底
+        if (!itemUnifyH || itemCanvasH < exportBounds.height) {
+          translateY = clampAnchorOffset(translateY, exportBounds.height, itemCanvasH, padT, padB);
+        }
+      }
 
       // 平移图层
       translateLayerBy(translateX, translateY);
@@ -594,7 +638,7 @@ export function batchExport(configJson: string): string {
       }
 
       try {
-        exportLayer.remove();
+        removeLayerById(exportLayer.id);
       } catch (eRemove) {
         // 删除失败不阻断流程
       }
@@ -617,6 +661,10 @@ export function batchExport(configJson: string): string {
       skipReason: lastSkipReason,
       hostVersion: getHostScriptVersion(),
       outputDir: outputDir,
+      // 影响对齐的元信息（面板不展示，仅供调试核对 004）
+      alignModeX: layoutXEffective ? "layout" : "ink",
+      alignModeY: layoutYEffective ? "layout" : "ink",
+      alignFallback: alignFallback,
     };
 
     app.displayDialogs = oldDialogs;
@@ -658,6 +706,14 @@ export function measureCharacters(configJson: string): string {
     var srcDoc = app.activeDocument;
     var srcLayerId = srcDoc.activeLayer.id;
 
+    // 与 batchExport 同一套分轴对齐语义（缺省：水平 ink + 垂直 layout）
+    var alignModeX = config.alignModeX;
+    var alignModeY = config.alignModeY;
+    if (alignModeX == null) { alignModeX = config.alignMode; }
+    if (alignModeY == null) { alignModeY = config.alignMode; }
+    var layoutXRequested = alignModeX === "layout";
+    var layoutYRequested = alignModeY !== "ink";
+
     // 全局关闭 PS 对话框
     var oldDialogs = app.displayDialogs;
     app.displayDialogs = DialogModes.NO;
@@ -670,35 +726,19 @@ export function measureCharacters(configJson: string): string {
     // 隐藏模板层，防止原始文字残留
     templateLayer.hide();
 
-    var maxW = 0;
-    var maxH = 0;
-
-    for (var i = 0; i < items.length; i++) {
-      var ch = items[i].text;
-
-      // 复制模板层 → 改文字（属性/效果/不透明度全保留）
-      var layer = duplicateLayer(templateLayer.id);
-      changeLayerText(ch);
-
-      var bounds = layer.bounds();
-
-      // 仅该轴参与统一的项才计入对应轴的最大尺寸（两轴可来自不同项）
-      if (isUnifyAxis(items[i].unifyWidth)) {
-        var charW = Math.ceil(bounds.width);
-        if (charW > maxW) maxW = charW;
-      }
-      if (isUnifyAxis(items[i].unifyHeight)) {
-        var charH = Math.ceil(bounds.height);
-        if (charH > maxH) maxH = charH;
-      }
-
-      try { layer.remove(); } catch (e) { /* 忽略 */ }
-    }
+    // 与 batchExport 共用测量逻辑，保证「检测值 = 导出实际尺寸」
+    var measured = measureItemSet(
+      templateLayer.id,
+      items,
+      layoutXRequested && isPointTextLayer(templateLayer),
+      layoutYRequested,
+      layoutXRequested && anchorNeedsWidthReference(config.anchor)
+    );
 
     workDoc.close(false);
 
     app.displayDialogs = oldDialogs;
-    return JSON.stringify({ maxWidth: maxW, maxHeight: maxH });
+    return JSON.stringify({ maxWidth: measured.maxW, maxHeight: measured.maxH });
   } catch (e) {
     try { app.displayDialogs = oldDialogs; } catch (e2) { /* 忽略 */ }
     return "__ERROR__:" + e;
@@ -773,6 +813,273 @@ function calcWorkDocSize(fontSize: number): number {
   if (size < 2000) size = 2000;
   if (size > 10000) size = 10000;
   return size;
+}
+
+/* ==================== 004 排印框对齐：测量与参考 ==================== */
+
+/**
+ * 空测量结果（墨迹模式 / 未测量时的兜底结构，保持字段完整便于调用方直读）
+ */
+function emptyMeasurement(): any {
+  return {
+    maxW: 0,
+    maxH: 0,
+    unifiedWCount: 0,
+    unifiedHCount: 0,
+    advWidths: [] as number[],
+    inkWidths: [] as number[],
+    boxes: [] as any[],
+    unionTop: 0,
+    unionBottom: 0,
+    unionH: 0,
+    hasUnion: false,
+    advanceUsable: true,
+    advanceReason: "",
+  };
+}
+
+/**
+ * 逐项测量（batchExport 与 measureCharacters 共用，保证「检测值 = 导出实际尺寸」）
+ *
+ * 两轴独立：
+ * - layoutX（水平排印框）：maxW = 参与统一宽项的 max(字宽之和, 墨迹宽)；字宽测不出时回退墨迹宽
+ * - layoutY（垂直排印框）：maxH = 参与统一高项墨迹上下沿的并集高（并集 ≥ 各项墨迹高，保证不裁切）
+ * - 该轴不启用排印框时按旧行为取「各项最大墨迹尺寸」
+ * - 无论哪种组合都回传每项墨迹框 / 字宽 / 并集范围，供定位阶段按轴选用
+ *
+ * 多行文本会让「追加末字符取差」跨行失真 → advanceUsable=false（**只影响水平轴**，
+ * 垂直轴的墨迹框对多行依然有效），调用方让水平退回墨迹
+ *
+ * @param templateLayerId 模板层 ID（同文档复制用）
+ * @param items 导出项
+ * @param layoutX 水平轴是否启用排印框参考
+ * @param layoutY 垂直轴是否启用排印框参考
+ * @param needAdvance 是否需要逐项字宽（水平居中/右侧锚点才需要）
+ */
+function measureItemSet(
+  templateLayerId: number,
+  items: any[],
+  layoutX: boolean,
+  layoutY: boolean,
+  needAdvance: boolean
+): any {
+  var result = emptyMeasurement();
+  var suffixKeys: string[] = [];
+  var suffixRights: number[] = [];
+
+  for (var i = 0; i < items.length; i++) {
+    var itemTextStr = items[i].text;
+    var unifyW = isUnifyAxis(items[i].unifyWidth);
+    var unifyH = isUnifyAxis(items[i].unifyHeight);
+
+    var textValue = itemTextStr == null ? "" : String(itemTextStr);
+    if (layoutX && (textValue.indexOf("\n") >= 0 || textValue.indexOf("\r") >= 0)) {
+      result.advanceUsable = false;
+      result.advanceReason = "multiline";
+    }
+
+    // 复制模板层 → 改文字（属性/效果/不透明度全保留）
+    var layer = duplicateLayer(templateLayerId);
+    changeLayerText(itemTextStr);
+    var bounds = layer.bounds();
+
+    var inkW = Math.ceil(bounds.width);
+    var inkH = Math.ceil(bounds.height);
+
+    result.advWidths.push(0);
+    result.inkWidths.push(inkW);
+    result.boxes.push({ y: bounds.y, height: bounds.height });
+
+    if (unifyW) {
+      result.unifiedWCount++;
+      var candW = inkW;
+      if (layoutX && needAdvance && result.advanceUsable) {
+        var advance = measureAdvanceForText(templateLayerId, textValue, bounds, suffixKeys, suffixRights);
+        // 字宽有效则记录；字宽小于墨迹宽（斜体/描边等溢出）时统一尺寸仍取墨迹宽
+        result.advWidths[i] = advance;
+        if (advance > 0 && Math.ceil(advance) > candW) {
+          candW = Math.ceil(advance);
+        }
+      }
+      if (candW > result.maxW) {
+        result.maxW = candW;
+      }
+    }
+
+    if (unifyH) {
+      result.unifiedHCount++;
+      if (!result.hasUnion) {
+        result.unionTop = bounds.y;
+        result.unionBottom = bounds.y + bounds.height;
+        result.hasUnion = true;
+      } else {
+        if (bounds.y < result.unionTop) {
+          result.unionTop = bounds.y;
+        }
+        if (bounds.y + bounds.height > result.unionBottom) {
+          result.unionBottom = bounds.y + bounds.height;
+        }
+      }
+      if (!layoutY && inkH > result.maxH) {
+        result.maxH = inkH;
+      }
+    }
+
+    try {
+      removeLayerById(layer.id);
+    } catch (eRemove) {
+      // 删除失败不阻断流程
+    }
+  }
+
+  if (result.hasUnion) {
+    result.unionH = result.unionBottom - result.unionTop;
+  }
+  if (layoutY && result.unifiedHCount > 0) {
+    result.maxH = Math.ceil(result.unionH);
+  }
+
+  return result;
+}
+
+/**
+ * 测量一项文本的字宽之和（advance 之和）
+ *
+ * 同一文字原点下：inkRight(文本 + 末字符) − inkRight(末字符) = Σ字宽(文本)。
+ * 末字符单独渲染的右边界按字符缓存（同一末字符只测一次）。
+ *
+ * @returns 字宽之和；末字符为空白/代理对半个字符/测不出结果时返回 0（调用方回退墨迹宽）
+ */
+function measureAdvanceForText(
+  templateLayerId: number,
+  textValue: string,
+  itemBounds: any,
+  suffixKeys: string[],
+  suffixRights: number[]
+): number {
+  if (textValue.length === 0) {
+    return 0;
+  }
+  var suffix = textValue.charAt(textValue.length - 1);
+  if (!isUsableSuffixChar(suffix)) {
+    return 0;
+  }
+
+  var suffixRight = -1;
+  var cached = indexOfString(suffixKeys, suffix);
+  if (cached >= 0) {
+    suffixRight = suffixRights[cached];
+  } else if (textValue.length === 1) {
+    // 单项本身就是末字符：直接用它自己的墨迹右边界，省一次测量
+    suffixRight = itemBounds.x + itemBounds.width;
+    suffixKeys.push(suffix);
+    suffixRights.push(suffixRight);
+  } else {
+    var probeLayer: any = duplicateLayer(templateLayerId);
+    changeLayerText(suffix);
+    var probeBounds = probeLayer.bounds();
+    suffixRight = probeBounds.x + probeBounds.width;
+    try {
+      removeLayerById(probeLayer.id);
+    } catch (eProbe) {
+      // 删除失败不阻断流程
+    }
+    suffixKeys.push(suffix);
+    suffixRights.push(suffixRight);
+  }
+  if (!(suffixRight >= 0)) {
+    return 0;
+  }
+
+  // 追加末字符后的墨迹右边界
+  var appendLayer: any = duplicateLayer(templateLayerId);
+  changeLayerText(textValue + suffix);
+  var appendBounds = appendLayer.bounds();
+  var withSuffixRight = appendBounds.x + appendBounds.width;
+  try {
+    removeLayerById(appendLayer.id);
+  } catch (eAppend) {
+    // 删除失败不阻断流程
+  }
+
+  return calcAdvanceWidth(withSuffixRight, suffixRight);
+}
+
+/**
+ * 挑出参与统一高的项对应的墨迹框（供「组内众数参考框」使用）
+ */
+function pickUnifiedHeightBoxes(items: any[], boxes: any[]): any[] {
+  var out: any[] = [];
+  for (var i = 0; i < items.length; i++) {
+    if (i < boxes.length && isUnifyAxis(items[i].unifyHeight)) {
+      out.push(boxes[i]);
+    }
+  }
+  return out;
+}
+
+/**
+ * 模板层是否点文本：段落文本有固定文本框，字宽差值法会失真
+ *
+ * 注意：ps-api 的 Layer 只是 id 包装，没有 textItem 属性，必须回到 DOM 按 id 取图层；
+ * 读不到 kind（非文本层 / 图层在组内）时保守按点文本处理
+ */
+function isPointTextLayer(templateLayer: any): boolean {
+  try {
+    var layers = app.activeDocument.layers;
+    for (var i = 0; i < layers.length; i++) {
+      var domLayer = layers[i] as any;
+      if (domLayer.id !== templateLayer.id) {
+        continue;
+      }
+      if (domLayer.textItem.kind === TextType.PARAGRAPHTEXT) {
+        return false;
+      }
+      return true;
+    }
+  } catch (e) {
+    return true;
+  }
+  return true;
+}
+
+/**
+ * 横向锚点是否需要「参考宽」：居中/右侧锚点需要字宽，左侧锚点只需墨迹左边界
+ */
+function anchorNeedsWidthReference(anchor: string): boolean {
+  if (anchor === "top-center" || anchor === "middle-center" || anchor === "bottom-center") {
+    return true;
+  }
+  if (anchor === "top-right" || anchor === "middle-right" || anchor === "bottom-right") {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 末字符能否用于字宽探测：空白无墨迹、代理对（半个字符）都会让差值法失真
+ */
+function isUsableSuffixChar(ch: string): boolean {
+  if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r" || ch === "\u3000") {
+    return false;
+  }
+  var code = ch.charCodeAt(0);
+  if (code >= 0xD800 && code <= 0xDFFF) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 字符串数组查找（不用 Array.prototype.indexOf，保持 ES3 保守写法）
+ */
+function indexOfString(arr: string[], value: string): number {
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i] === value) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 

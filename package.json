@@ -13,6 +13,7 @@
     "dev:jsx": "webpack --config webpack.config.jsx.js --watch",
     "clean": "rimraf dist installer",
     "verify:export": "node scripts/verify-export-alignment.js",
+    "verify:text-alignment": "node scripts/verify-text-alignment.js",
     "package": "npm run build:jsx:prod && npm run build:panel:prod && node scripts/build-installer.js",
     "release": "node scripts/release.js"
   },
